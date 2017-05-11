@@ -4,5 +4,8 @@
   },
   "runtimes": {
     "win": {}
+  },
+  "dependencies": {
+    "NuGet.Build.Packaging": "0.1.248"
   }
 }
