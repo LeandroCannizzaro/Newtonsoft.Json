@@ -6,6 +6,6 @@
     "win": {}
   },
   "dependencies": {
-    "NuGet.Build.Packaging": "0.1.276"
+    "NuGet.Build.Packaging": "0.2.0"
   }
 }
