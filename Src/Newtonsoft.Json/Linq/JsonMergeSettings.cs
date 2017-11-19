@@ -16,7 +16,7 @@ namespace Newtonsoft.Json.Linq
         /// <value>The method used when merging JSON arrays.</value>
         public MergeArrayHandling MergeArrayHandling
         {
-            get { return _mergeArrayHandling; }
+            get => _mergeArrayHandling;
             set
             {
                 if (value < MergeArrayHandling.Concat || value > MergeArrayHandling.Merge)
@@ -29,12 +29,12 @@ namespace Newtonsoft.Json.Linq
         }
 
         /// <summary>
-        /// Gets or sets how how null value properties are merged.
+        /// Gets or sets how null value properties are merged.
         /// </summary>
         /// <value>How null value properties are merged.</value>
         public MergeNullValueHandling MergeNullValueHandling
         {
-            get { return _mergeNullValueHandling; }
+            get => _mergeNullValueHandling;
             set
             {
                 if (value < MergeNullValueHandling.Ignore || value > MergeNullValueHandling.Merge)

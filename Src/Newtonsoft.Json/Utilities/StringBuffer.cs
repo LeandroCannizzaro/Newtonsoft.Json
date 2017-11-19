@@ -28,7 +28,7 @@ using System;
 namespace Newtonsoft.Json.Utilities
 {
     /// <summary>
-    /// Builds a string. Unlike StringBuilder this class lets you reuse it's internal buffer.
+    /// Builds a string. Unlike <see cref="System.Text.StringBuilder"/> this class lets you reuse its internal buffer.
     /// </summary>
     internal struct StringBuffer
     {
@@ -37,14 +37,11 @@ namespace Newtonsoft.Json.Utilities
 
         public int Position
         {
-            get { return _position; }
-            set { _position = value; }
+            get => _position;
+            set => _position = value;
         }
 
-        public bool IsEmpty
-        {
-            get { return _buffer == null; }
-        }
+        public bool IsEmpty => _buffer == null;
 
         public StringBuffer(IArrayPool<char> bufferPool, int initalSize) : this(BufferUtils.RentBuffer(bufferPool, initalSize))
         {
@@ -114,9 +111,6 @@ namespace Newtonsoft.Json.Utilities
             return new string(_buffer, start, length);
         }
 
-        public char[] InternalBuffer
-        {
-            get { return _buffer; }
-        }
+        public char[] InternalBuffer => _buffer;
     }
 }

@@ -30,7 +30,7 @@ using System.Collections.Generic;
 using Newtonsoft.Json.Linq;
 using Newtonsoft.Json.Utilities;
 using Newtonsoft.Json.Serialization;
-#if NET20
+#if !HAVE_LINQ
 using Newtonsoft.Json.Utilities.LinqBridge;
 #else
 using System.Linq;
@@ -72,13 +72,13 @@ namespace Newtonsoft.Json.Schema
 
                 return _contractResolver;
             }
-            set { _contractResolver = value; }
+            set => _contractResolver = value;
         }
 
         private class TypeSchema
         {
-            public Type Type { get; private set; }
-            public JsonSchema Schema { get; private set; }
+            public Type Type { get; }
+            public JsonSchema Schema { get; }
 
             public TypeSchema(Type type, JsonSchema schema)
             {
@@ -94,10 +94,7 @@ namespace Newtonsoft.Json.Schema
         private readonly IList<TypeSchema> _stack = new List<TypeSchema>();
         private JsonSchema _currentSchema;
 
-        private JsonSchema CurrentSchema
-        {
-            get { return _currentSchema; }
-        }
+        private JsonSchema CurrentSchema => _currentSchema;
 
         private void Push(TypeSchema typeSchema)
         {
@@ -176,7 +173,7 @@ namespace Newtonsoft.Json.Schema
         {
             JsonContainerAttribute containerAttribute = JsonTypeReflector.GetCachedAttribute<JsonContainerAttribute>(type);
 
-            if (containerAttribute != null && !string.IsNullOrEmpty(containerAttribute.Title))
+            if (!string.IsNullOrEmpty(containerAttribute?.Title))
             {
                 return containerAttribute.Title;
             }
@@ -188,27 +185,24 @@ namespace Newtonsoft.Json.Schema
         {
             JsonContainerAttribute containerAttribute = JsonTypeReflector.GetCachedAttribute<JsonContainerAttribute>(type);
 
-            if (containerAttribute != null && !string.IsNullOrEmpty(containerAttribute.Description))
+            if (!string.IsNullOrEmpty(containerAttribute?.Description))
             {
                 return containerAttribute.Description;
             }
 
-#if !(DOTNET || PORTABLE40 || PORTABLE)
+#if HAVE_ADO_NET
             DescriptionAttribute descriptionAttribute = ReflectionUtils.GetAttribute<DescriptionAttribute>(type);
-            if (descriptionAttribute != null)
-            {
-                return descriptionAttribute.Description;
-            }
-#endif
-
+            return descriptionAttribute?.Description;
+#else
             return null;
+#endif
         }
 
         private string GetTypeId(Type type, bool explicitOnly)
         {
             JsonContainerAttribute containerAttribute = JsonTypeReflector.GetCachedAttribute<JsonContainerAttribute>(type);
 
-            if (containerAttribute != null && !string.IsNullOrEmpty(containerAttribute.Id))
+            if (!string.IsNullOrEmpty(containerAttribute?.Id))
             {
                 return containerAttribute.Id;
             }
@@ -263,15 +257,7 @@ namespace Newtonsoft.Json.Schema
             }
 
             JsonContract contract = ContractResolver.ResolveContract(type);
-            JsonConverter converter;
-            if ((converter = contract.Converter) != null || (converter = contract.InternalConverter) != null)
-            {
-                JsonSchema converterSchema = converter.GetSchema();
-                if (converterSchema != null)
-                {
-                    return converterSchema;
-                }
-            }
+            JsonConverter converter = contract.Converter ?? contract.InternalConverter;
 
             Push(new TypeSchema(type, new JsonSchema()));
 
@@ -357,14 +343,14 @@ namespace Newtonsoft.Json.Schema
                             }
                         }
                         break;
-#if !(DOTNET || PORTABLE || PORTABLE40)
+#if HAVE_BINARY_SERIALIZATION
                     case JsonContractType.Serializable:
                         CurrentSchema.Type = AddNullType(JsonSchemaType.Object, valueRequired);
                         CurrentSchema.Id = GetTypeId(type, false);
                         GenerateISerializableContract(type, (JsonISerializableContract)contract);
                         break;
 #endif
-#if !(NET35 || NET20 || PORTABLE40)
+#if HAVE_DYNAMIC
                     case JsonContractType.Dynamic:
 #endif
                     case JsonContractType.Linq:
@@ -422,7 +408,7 @@ namespace Newtonsoft.Json.Schema
             }
         }
 
-#if !(DOTNET || PORTABLE || PORTABLE40)
+#if HAVE_BINARY_SERIALIZATION
         private void GenerateISerializableContract(Type type, JsonISerializableContract contract)
         {
             CurrentSchema.AllowAdditionalProperties = true;
@@ -471,7 +457,7 @@ namespace Newtonsoft.Json.Schema
                 case PrimitiveTypeCode.Empty:
                 case PrimitiveTypeCode.Object:
                     return schemaType | JsonSchemaType.String;
-#if !(DOTNET || PORTABLE)
+#if HAVE_DB_NULL_TYPE_CODE
                 case PrimitiveTypeCode.DBNull:
                     return schemaType | JsonSchemaType.Null;
 #endif
@@ -487,7 +473,7 @@ namespace Newtonsoft.Json.Schema
                 case PrimitiveTypeCode.UInt32:
                 case PrimitiveTypeCode.Int64:
                 case PrimitiveTypeCode.UInt64:
-#if !(PORTABLE || NET35 || NET20) || NETSTANDARD1_1
+#if HAVE_BIG_INTEGER
                 case PrimitiveTypeCode.BigInteger:
 #endif
                     return schemaType | JsonSchemaType.Integer;
@@ -497,7 +483,7 @@ namespace Newtonsoft.Json.Schema
                     return schemaType | JsonSchemaType.Float;
                 // convert to string?
                 case PrimitiveTypeCode.DateTime:
-#if !NET20
+#if HAVE_DATE_TIME_OFFSET
                 case PrimitiveTypeCode.DateTimeOffset:
 #endif
                     return schemaType | JsonSchemaType.String;

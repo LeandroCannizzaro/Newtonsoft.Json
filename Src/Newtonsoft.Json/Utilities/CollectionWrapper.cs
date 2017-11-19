@@ -28,7 +28,7 @@ using System.Collections;
 using System.Collections.Generic;
 using System.Threading;
 using System.Globalization;
-#if NET20
+#if !HAVE_LINQ
 using Newtonsoft.Json.Utilities.LinqBridge;
 #else
 using System.Linq;
@@ -52,9 +52,9 @@ namespace Newtonsoft.Json.Utilities
         {
             ValidationUtils.ArgumentNotNull(list, nameof(list));
 
-            if (list is ICollection<T>)
+            if (list is ICollection<T> collection)
             {
-                _genericCollection = (ICollection<T>)list;
+                _genericCollection = collection;
             }
             else
             {
@@ -168,24 +168,12 @@ namespace Newtonsoft.Json.Utilities
 
         public virtual IEnumerator<T> GetEnumerator()
         {
-            if (_genericCollection != null)
-            {
-                return _genericCollection.GetEnumerator();
-            }
-
-            return _list.Cast<T>().GetEnumerator();
+            return (_genericCollection ?? _list.Cast<T>()).GetEnumerator();
         }
 
         IEnumerator IEnumerable.GetEnumerator()
         {
-            if (_genericCollection != null)
-            {
-                return _genericCollection.GetEnumerator();
-            }
-            else
-            {
-                return _list.GetEnumerator();
-            }
+            return ((IEnumerable)_genericCollection ?? _list).GetEnumerator();
         }
 
         int IList.Add(object value)
@@ -294,10 +282,7 @@ namespace Newtonsoft.Json.Utilities
             CopyTo((T[])array, arrayIndex);
         }
 
-        bool ICollection.IsSynchronized
-        {
-            get { return false; }
-        }
+        bool ICollection.IsSynchronized => false;
 
         object ICollection.SyncRoot
         {
@@ -330,19 +315,6 @@ namespace Newtonsoft.Json.Utilities
             return true;
         }
 
-        public object UnderlyingCollection
-        {
-            get
-            {
-                if (_genericCollection != null)
-                {
-                    return _genericCollection;
-                }
-                else
-                {
-                    return _list;
-                }
-            }
-        }
+        public object UnderlyingCollection => (object)_genericCollection ?? _list;
     }
 }

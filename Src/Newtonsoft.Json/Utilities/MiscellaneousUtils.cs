@@ -39,15 +39,11 @@ namespace Newtonsoft.Json.Utilities
     {
         public static bool ValueEquals(object objA, object objB)
         {
-            if (objA == null && objB == null)
+            if (objA == objB)
             {
                 return true;
             }
-            if (objA != null && objB == null)
-            {
-                return false;
-            }
-            if (objA == null && objB != null)
+            if (objA == null || objB == null)
             {
                 return false;
             }
@@ -112,18 +108,14 @@ namespace Newtonsoft.Json.Utilities
 
         public static string GetPrefix(string qualifiedName)
         {
-            string prefix;
-            string localName;
-            GetQualifiedNameParts(qualifiedName, out prefix, out localName);
+            GetQualifiedNameParts(qualifiedName, out string prefix, out _);
 
             return prefix;
         }
 
         public static string GetLocalName(string qualifiedName)
         {
-            string prefix;
-            string localName;
-            GetQualifiedNameParts(qualifiedName, out prefix, out localName);
+            GetQualifiedNameParts(qualifiedName, out _, out string localName);
 
             return localName;
         }

@@ -31,7 +31,7 @@ using System.Globalization;
 using System.Reflection;
 using System.Runtime.Serialization;
 using Newtonsoft.Json.Utilities;
-#if NET20
+#if !HAVE_LINQ
 using Newtonsoft.Json.Utilities.LinqBridge;
 #else
 using System.Linq;
@@ -47,12 +47,14 @@ namespace Newtonsoft.Json.Converters
     {
         /// <summary>
         /// Gets or sets a value indicating whether the written enum text should be camel case.
+        /// The default value is <c>false</c>.
         /// </summary>
         /// <value><c>true</c> if the written enum text will be camel case; otherwise, <c>false</c>.</value>
         public bool CamelCaseText { get; set; }
 
         /// <summary>
         /// Gets or sets a value indicating whether integer values are allowed when deserializing.
+        /// The default value is <c>true</c>.
         /// </summary>
         /// <value><c>true</c> if integers are allowed when deserializing; otherwise, <c>false</c>.</value>
         public bool AllowIntegerValues { get; set; }
@@ -95,6 +97,11 @@ namespace Newtonsoft.Json.Converters
 
             if (char.IsNumber(enumName[0]) || enumName[0] == '-')
             {
+                if (!AllowIntegerValues)
+                {
+                    throw JsonSerializationException.Create(null, writer.ContainerPath, "Integer value {0} is not allowed.".FormatWith(CultureInfo.InvariantCulture, enumName), null);
+                }
+
                 // enum value has no name so write number
                 writer.WriteValue(value);
             }

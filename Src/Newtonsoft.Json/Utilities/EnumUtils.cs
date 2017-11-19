@@ -27,7 +27,7 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Runtime.Serialization;
-#if NET20
+#if !HAVE_LINQ
 using Newtonsoft.Json.Utilities.LinqBridge;
 #else
 using System.Linq;
@@ -51,7 +51,7 @@ namespace Newtonsoft.Json.Utilities
                 string n1 = f.Name;
                 string n2;
 
-#if !NET20
+#if HAVE_DATA_CONTRACTS
                 n2 = f.GetCustomAttributes(typeof(EnumMemberAttribute), true)
                     .Cast<EnumMemberAttribute>()
                     .Select(a => a.Value)
@@ -60,8 +60,7 @@ namespace Newtonsoft.Json.Utilities
                 n2 = f.Name;
 #endif
 
-                string s;
-                if (map.TryGetBySecond(n2, out s))
+                if (map.TryGetBySecond(n2, out _))
                 {
                     throw new InvalidOperationException("Enum name '{0}' already exists on enum '{1}'.".FormatWith(CultureInfo.InvariantCulture, n2, type.Name));
                 }
@@ -104,7 +103,7 @@ namespace Newtonsoft.Json.Utilities
         }
 
         /// <summary>
-        /// Gets a dictionary of the names and values of an Enum type.
+        /// Gets a dictionary of the names and values of an <see cref="Enum"/> type.
         /// </summary>
         /// <returns></returns>
         public static IList<EnumValue<ulong>> GetNamesAndValues<T>() where T : struct
@@ -126,7 +125,7 @@ namespace Newtonsoft.Json.Utilities
 
             if (!enumType.IsEnum())
             {
-                throw new ArgumentException("Type {0} is not an Enum.".FormatWith(CultureInfo.InvariantCulture, enumType), nameof(enumType));
+                throw new ArgumentException("Type {0} is not an enum.".FormatWith(CultureInfo.InvariantCulture, enumType.Name), nameof(enumType));
             }
 
             IList<object> enumValues = GetValues(enumType);
@@ -143,7 +142,7 @@ namespace Newtonsoft.Json.Utilities
                 catch (OverflowException e)
                 {
                     throw new InvalidOperationException(
-                        string.Format(CultureInfo.InvariantCulture, "Value from enum with the underlying type of {0} cannot be added to dictionary with a value type of {1}. Value was too large: {2}",
+                        "Value from enum with the underlying type of {0} cannot be added to dictionary with a value type of {1}. Value was too large: {2}".FormatWith(CultureInfo.InvariantCulture,
                             Enum.GetUnderlyingType(enumType), typeof(TUnderlyingType), Convert.ToUInt64(enumValues[i], CultureInfo.InvariantCulture)), e);
                 }
             }
@@ -155,7 +154,7 @@ namespace Newtonsoft.Json.Utilities
         {
             if (!enumType.IsEnum())
             {
-                throw new ArgumentException("Type '" + enumType.Name + "' is not an enum.");
+                throw new ArgumentException("Type {0} is not an enum.".FormatWith(CultureInfo.InvariantCulture, enumType.Name), nameof(enumType));
             }
 
             List<object> values = new List<object>();
@@ -173,7 +172,7 @@ namespace Newtonsoft.Json.Utilities
         {
             if (!enumType.IsEnum())
             {
-                throw new ArgumentException("Type '" + enumType.Name + "' is not an enum.");
+                throw new ArgumentException("Type {0} is not an enum.".FormatWith(CultureInfo.InvariantCulture, enumType.Name), nameof(enumType));
             }
 
             List<string> values = new List<string>();
@@ -196,8 +195,7 @@ namespace Newtonsoft.Json.Utilities
             string finalEnumText;
 
             BidirectionalDictionary<string, string> map = EnumMemberNamesPerType.Get(t);
-            string resolvedEnumName;
-            if (TryResolvedEnumName(map, enumText, out resolvedEnumName))
+            if (TryResolvedEnumName(map, enumText, out string resolvedEnumName))
             {
                 finalEnumText = resolvedEnumName;
             }
@@ -221,15 +219,7 @@ namespace Newtonsoft.Json.Utilities
 
                 if (disallowValue)
                 {
-                    bool isNumber = true;
-                    for (int i = 0; i < finalEnumText.Length; i++)
-                    {
-                        if (!char.IsNumber(finalEnumText[i]))
-                        {
-                            isNumber = false;
-                            break;
-                        }
-                    }
+                    bool isNumber = int.TryParse(finalEnumText, NumberStyles.AllowLeadingSign, CultureInfo.InvariantCulture, out int _);
 
                     if (isNumber)
                     {
@@ -250,8 +240,7 @@ namespace Newtonsoft.Json.Utilities
             {
                 string name = names[i].Trim();
 
-                string resolvedEnumName;
-                map.TryGetByFirst(name, out resolvedEnumName);
+                map.TryGetByFirst(name, out string resolvedEnumName);
                 resolvedEnumName = resolvedEnumName ?? name;
 
                 if (camelCaseText)

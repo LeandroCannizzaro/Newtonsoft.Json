@@ -28,7 +28,7 @@ using System.Globalization;
 using System.Reflection;
 using Newtonsoft.Json.Serialization;
 
-#if NET20
+#if !HAVE_LINQ
 using Newtonsoft.Json.Utilities.LinqBridge;
 #endif
 
@@ -38,14 +38,12 @@ namespace Newtonsoft.Json.Utilities
     {
         public Func<T, object> CreateGet<T>(MemberInfo memberInfo)
         {
-            PropertyInfo propertyInfo = memberInfo as PropertyInfo;
-            if (propertyInfo != null)
+            if (memberInfo is PropertyInfo propertyInfo)
             {
                 return CreateGet<T>(propertyInfo);
             }
 
-            FieldInfo fieldInfo = memberInfo as FieldInfo;
-            if (fieldInfo != null)
+            if (memberInfo is FieldInfo fieldInfo)
             {
                 return CreateGet<T>(fieldInfo);
             }
@@ -55,14 +53,12 @@ namespace Newtonsoft.Json.Utilities
 
         public Action<T, object> CreateSet<T>(MemberInfo memberInfo)
         {
-            PropertyInfo propertyInfo = memberInfo as PropertyInfo;
-            if (propertyInfo != null)
+            if (memberInfo is PropertyInfo propertyInfo)
             {
                 return CreateSet<T>(propertyInfo);
             }
 
-            FieldInfo fieldInfo = memberInfo as FieldInfo;
-            if (fieldInfo != null)
+            if (memberInfo is FieldInfo fieldInfo)
             {
                 return CreateSet<T>(fieldInfo);
             }

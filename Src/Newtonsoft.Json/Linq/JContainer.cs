@@ -25,7 +25,7 @@
 
 using System;
 using System.Collections.Generic;
-#if !PORTABLE40
+#if HAVE_INOTIFY_COLLECTION_CHANGED
 using System.Collections.Specialized;
 #endif
 using System.Threading;
@@ -33,7 +33,7 @@ using Newtonsoft.Json.Utilities;
 using System.Collections;
 using System.Globalization;
 using System.ComponentModel;
-#if NET20
+#if !HAVE_LINQ
 using Newtonsoft.Json.Utilities.LinqBridge;
 #else
 using System.Linq;
@@ -45,16 +45,16 @@ namespace Newtonsoft.Json.Linq
     /// <summary>
     /// Represents a token that can contain other tokens.
     /// </summary>
-    public abstract class JContainer : JToken, IList<JToken>
-#if !(DOTNET || PORTABLE || PORTABLE40)
+    public abstract partial class JContainer : JToken, IList<JToken>
+#if HAVE_COMPONENT_MODEL
         , ITypedList, IBindingList
 #endif
         , IList
-#if !(NET20 || NET35 || PORTABLE40)
+#if HAVE_INOTIFY_COLLECTION_CHANGED
         , INotifyCollectionChanged
 #endif
     {
-#if !(DOTNET || PORTABLE40 || PORTABLE)
+#if HAVE_COMPONENT_MODEL
         internal ListChangedEventHandler _listChanged;
         internal AddingNewEventHandler _addingNew;
 
@@ -63,8 +63,8 @@ namespace Newtonsoft.Json.Linq
         /// </summary>
         public event ListChangedEventHandler ListChanged
         {
-            add { _listChanged += value; }
-            remove { _listChanged -= value; }
+            add => _listChanged += value;
+            remove => _listChanged -= value;
         }
 
         /// <summary>
@@ -72,11 +72,11 @@ namespace Newtonsoft.Json.Linq
         /// </summary>
         public event AddingNewEventHandler AddingNew
         {
-            add { _addingNew += value; }
-            remove { _addingNew -= value; }
+            add => _addingNew += value;
+            remove => _addingNew -= value;
         }
 #endif
-#if !(NET20 || NET35 || PORTABLE40)
+#if HAVE_INOTIFY_COLLECTION_CHANGED
         internal NotifyCollectionChangedEventHandler _collectionChanged;
 
         /// <summary>
@@ -96,7 +96,7 @@ namespace Newtonsoft.Json.Linq
         protected abstract IList<JToken> ChildrenTokens { get; }
 
         private object _syncRoot;
-#if !(PORTABLE40)
+#if (HAVE_COMPONENT_MODEL || HAVE_INOTIFY_COLLECTION_CHANGED)
         private bool _busy;
 #endif
 
@@ -119,7 +119,7 @@ namespace Newtonsoft.Json.Linq
 
         internal void CheckReentrancy()
         {
-#if !(PORTABLE40)
+#if (HAVE_COMPONENT_MODEL || HAVE_INOTIFY_COLLECTION_CHANGED)
             if (_busy)
             {
                 throw new InvalidOperationException("Cannot change {0} during a collection change event.".FormatWith(CultureInfo.InvariantCulture, GetType()));
@@ -132,18 +132,14 @@ namespace Newtonsoft.Json.Linq
             return new List<JToken>();
         }
 
-#if !(DOTNET || PORTABLE40 || PORTABLE)
+#if HAVE_COMPONENT_MODEL
         /// <summary>
         /// Raises the <see cref="AddingNew"/> event.
         /// </summary>
         /// <param name="e">The <see cref="AddingNewEventArgs"/> instance containing the event data.</param>
         protected virtual void OnAddingNew(AddingNewEventArgs e)
         {
-            AddingNewEventHandler handler = _addingNew;
-            if (handler != null)
-            {
-                handler(this, e);
-            }
+            _addingNew?.Invoke(this, e);
         }
 
         /// <summary>
@@ -168,7 +164,7 @@ namespace Newtonsoft.Json.Linq
             }
         }
 #endif
-#if !(NET20 || NET35 || PORTABLE40)
+#if HAVE_INOTIFY_COLLECTION_CHANGED
         /// <summary>
         /// Raises the <see cref="CollectionChanged"/> event.
         /// </summary>
@@ -198,10 +194,7 @@ namespace Newtonsoft.Json.Linq
         /// <value>
         /// 	<c>true</c> if this token has child values; otherwise, <c>false</c>.
         /// </value>
-        public override bool HasValues
-        {
-            get { return ChildrenTokens.Count > 0; }
-        }
+        public override bool HasValues => ChildrenTokens.Count > 0;
 
         internal bool ContentsEqual(JContainer container)
         {
@@ -286,7 +279,7 @@ namespace Newtonsoft.Json.Linq
         /// <summary>
         /// Returns a collection of the descendant tokens for this token in document order.
         /// </summary>
-        /// <returns>An <see cref="IEnumerable{JToken}"/> containing the descendant tokens of the <see cref="JToken"/>.</returns>
+        /// <returns>An <see cref="IEnumerable{T}"/> of <see cref="JToken"/> containing the descendant tokens of the <see cref="JToken"/>.</returns>
         public IEnumerable<JToken> Descendants()
         {
             return GetDescendants(false);
@@ -295,7 +288,7 @@ namespace Newtonsoft.Json.Linq
         /// <summary>
         /// Returns a collection of the tokens that contain this token, and all descendant tokens of this token, in document order.
         /// </summary>
-        /// <returns>An <see cref="IEnumerable{JToken}"/> containing this token, and all the descendant tokens of the <see cref="JToken"/>.</returns>
+        /// <returns>An <see cref="IEnumerable{T}"/> of <see cref="JToken"/> containing this token, and all the descendant tokens of the <see cref="JToken"/>.</returns>
         public IEnumerable<JToken> DescendantsAndSelf()
         {
             return GetDescendants(true);
@@ -311,8 +304,7 @@ namespace Newtonsoft.Json.Linq
             foreach (JToken o in ChildrenTokens)
             {
                 yield return o;
-                JContainer c = o as JContainer;
-                if (c != null)
+                if (o is JContainer c)
                 {
                     foreach (JToken d in c.Descendants())
                     {
@@ -388,13 +380,13 @@ namespace Newtonsoft.Json.Linq
 
             children.Insert(index, item);
 
-#if !(DOTNET || PORTABLE40 || PORTABLE)
+#if HAVE_COMPONENT_MODEL
             if (_listChanged != null)
             {
                 OnListChanged(new ListChangedEventArgs(ListChangedType.ItemAdded, index));
             }
 #endif
-#if !(NET20 || NET35 || PORTABLE40)
+#if HAVE_INOTIFY_COLLECTION_CHANGED
             if (_collectionChanged != null)
             {
                 OnCollectionChanged(new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Add, item, index));
@@ -436,13 +428,13 @@ namespace Newtonsoft.Json.Linq
 
             children.RemoveAt(index);
 
-#if !(DOTNET || PORTABLE40 || PORTABLE)
+#if HAVE_COMPONENT_MODEL
             if (_listChanged != null)
             {
                 OnListChanged(new ListChangedEventArgs(ListChangedType.ItemDeleted, index));
             }
 #endif
-#if !(NET20 || NET35 || PORTABLE40)
+#if HAVE_INOTIFY_COLLECTION_CHANGED
             if (_collectionChanged != null)
             {
                 OnCollectionChanged(new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Remove, item, index));
@@ -516,13 +508,13 @@ namespace Newtonsoft.Json.Linq
             existing.Previous = null;
             existing.Next = null;
 
-#if !(DOTNET || PORTABLE || PORTABLE40)
+#if HAVE_COMPONENT_MODEL
             if (_listChanged != null)
             {
                 OnListChanged(new ListChangedEventArgs(ListChangedType.ItemChanged, index));
             }
 #endif
-#if !(NET20 || NET35 || PORTABLE40)
+#if HAVE_INOTIFY_COLLECTION_CHANGED
             if (_collectionChanged != null)
             {
                 OnCollectionChanged(new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Replace, item, existing, index));
@@ -545,13 +537,13 @@ namespace Newtonsoft.Json.Linq
 
             children.Clear();
 
-#if !(DOTNET || PORTABLE40 || PORTABLE)
+#if HAVE_COMPONENT_MODEL
             if (_listChanged != null)
             {
                 OnListChanged(new ListChangedEventArgs(ListChangedType.Reset, -1));
             }
 #endif
-#if !(NET20 || NET35 || PORTABLE40)
+#if HAVE_INOTIFY_COLLECTION_CHANGED
             if (_collectionChanged != null)
             {
                 OnCollectionChanged(new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Reset));
@@ -604,8 +596,7 @@ namespace Newtonsoft.Json.Linq
 
         internal static bool IsTokenUnchanged(JToken currentValue, JToken newValue)
         {
-            JValue v1 = currentValue as JValue;
-            if (v1 != null)
+            if (currentValue is JValue v1)
             {
                 // null will get turned into a JValue of type null
                 if (v1.Type == JTokenType.Null && newValue == null)
@@ -675,8 +666,7 @@ namespace Newtonsoft.Json.Linq
 
         internal static JToken CreateFromContent(object content)
         {
-            JToken token = content as JToken;
-            if (token != null)
+            if (content is JToken token)
             {
                 return token;
             }
@@ -685,16 +675,16 @@ namespace Newtonsoft.Json.Linq
         }
 
         /// <summary>
-        /// Creates an <see cref="JsonWriter"/> that can be used to add tokens to the <see cref="JToken"/>.
+        /// Creates a <see cref="JsonWriter"/> that can be used to add tokens to the <see cref="JToken"/>.
         /// </summary>
-        /// <returns>An <see cref="JsonWriter"/> that is ready to have content written to it.</returns>
+        /// <returns>A <see cref="JsonWriter"/> that is ready to have content written to it.</returns>
         public JsonWriter CreateWriter()
         {
             return new JTokenWriter(this);
         }
 
         /// <summary>
-        /// Replaces the children nodes of this token with the specified content.
+        /// Replaces the child nodes of this token with the specified content.
         /// </summary>
         /// <param name="content">The content.</param>
         public void ReplaceAll(object content)
@@ -879,7 +869,7 @@ namespace Newtonsoft.Json.Linq
             return hashCode;
         }
 
-#if !(DOTNET || PORTABLE40 || PORTABLE)
+#if HAVE_COMPONENT_MODEL
         string ITypedList.GetListName(PropertyDescriptor[] listAccessors)
         {
             return string.Empty;
@@ -910,8 +900,8 @@ namespace Newtonsoft.Json.Linq
 
         JToken IList<JToken>.this[int index]
         {
-            get { return GetItem(index); }
-            set { SetItem(index, value); }
+            get => GetItem(index);
+            set => SetItem(index, value);
         }
         #endregion
 
@@ -936,10 +926,7 @@ namespace Newtonsoft.Json.Linq
             CopyItemsTo(array, arrayIndex);
         }
 
-        bool ICollection<JToken>.IsReadOnly
-        {
-            get { return false; }
-        }
+        bool ICollection<JToken>.IsReadOnly => false;
 
         bool ICollection<JToken>.Remove(JToken item)
         {
@@ -954,8 +941,7 @@ namespace Newtonsoft.Json.Linq
                 return null;
             }
 
-            JToken token = value as JToken;
-            if (token != null)
+            if (value is JToken token)
             {
                 return token;
             }
@@ -990,15 +976,9 @@ namespace Newtonsoft.Json.Linq
             InsertItem(index, EnsureValue(value), false);
         }
 
-        bool IList.IsFixedSize
-        {
-            get { return false; }
-        }
+        bool IList.IsFixedSize => false;
 
-        bool IList.IsReadOnly
-        {
-            get { return false; }
-        }
+        bool IList.IsReadOnly => false;
 
         void IList.Remove(object value)
         {
@@ -1012,8 +992,8 @@ namespace Newtonsoft.Json.Linq
 
         object IList.this[int index]
         {
-            get { return GetItem(index); }
-            set { SetItem(index, EnsureValue(value)); }
+            get => GetItem(index);
+            set => SetItem(index, EnsureValue(value));
         }
         #endregion
 
@@ -1026,16 +1006,10 @@ namespace Newtonsoft.Json.Linq
         /// <summary>
         /// Gets the count of child JSON tokens.
         /// </summary>
-        /// <value>The count of child JSON tokens</value>
-        public int Count
-        {
-            get { return ChildrenTokens.Count; }
-        }
+        /// <value>The count of child JSON tokens.</value>
+        public int Count => ChildrenTokens.Count;
 
-        bool ICollection.IsSynchronized
-        {
-            get { return false; }
-        }
+        bool ICollection.IsSynchronized => false;
 
         object ICollection.SyncRoot
         {
@@ -1052,7 +1026,7 @@ namespace Newtonsoft.Json.Linq
         #endregion
 
         #region IBindingList Members
-#if !(DOTNET || PORTABLE || PORTABLE40)
+#if HAVE_COMPONENT_MODEL
         void IBindingList.AddIndex(PropertyDescriptor property)
         {
         }
@@ -1078,20 +1052,11 @@ namespace Newtonsoft.Json.Linq
             return newItem;
         }
 
-        bool IBindingList.AllowEdit
-        {
-            get { return true; }
-        }
+        bool IBindingList.AllowEdit => true;
 
-        bool IBindingList.AllowNew
-        {
-            get { return true; }
-        }
+        bool IBindingList.AllowNew => true;
 
-        bool IBindingList.AllowRemove
-        {
-            get { return true; }
-        }
+        bool IBindingList.AllowRemove => true;
 
         void IBindingList.ApplySort(PropertyDescriptor property, ListSortDirection direction)
         {
@@ -1103,10 +1068,7 @@ namespace Newtonsoft.Json.Linq
             throw new NotSupportedException();
         }
 
-        bool IBindingList.IsSorted
-        {
-            get { return false; }
-        }
+        bool IBindingList.IsSorted => false;
 
         void IBindingList.RemoveIndex(PropertyDescriptor property)
         {
@@ -1117,30 +1079,15 @@ namespace Newtonsoft.Json.Linq
             throw new NotSupportedException();
         }
 
-        ListSortDirection IBindingList.SortDirection
-        {
-            get { return ListSortDirection.Ascending; }
-        }
+        ListSortDirection IBindingList.SortDirection => ListSortDirection.Ascending;
 
-        PropertyDescriptor IBindingList.SortProperty
-        {
-            get { return null; }
-        }
+        PropertyDescriptor IBindingList.SortProperty => null;
 
-        bool IBindingList.SupportsChangeNotification
-        {
-            get { return true; }
-        }
+        bool IBindingList.SupportsChangeNotification => true;
 
-        bool IBindingList.SupportsSearching
-        {
-            get { return false; }
-        }
+        bool IBindingList.SupportsSearching => false;
 
-        bool IBindingList.SupportsSorting
-        {
-            get { return false; }
-        }
+        bool IBindingList.SupportsSorting => false;
 #endif
         #endregion
 
@@ -1155,7 +1102,7 @@ namespace Newtonsoft.Json.Linq
                     }
                     break;
                 case MergeArrayHandling.Union:
-#if !NET20
+#if HAVE_HASH_SET
                     HashSet<JToken> items = new HashSet<JToken>(target, EqualityComparer);
 
                     foreach (JToken item in content)
@@ -1197,8 +1144,7 @@ namespace Newtonsoft.Json.Linq
                         {
                             JToken sourceItem = target[i];
 
-                            JContainer existingContainer = sourceItem as JContainer;
-                            if (existingContainer != null)
+                            if (sourceItem is JContainer existingContainer)
                             {
                                 existingContainer.Merge(targetItem, settings);
                             }
