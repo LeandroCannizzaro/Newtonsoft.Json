@@ -30,7 +30,7 @@ using Newtonsoft.Json.Utilities;
 namespace Newtonsoft.Json.Converters
 {
     /// <summary>
-    /// Converts a <see cref="DateTime"/> to and from the ISO 8601 date format (e.g. 2008-04-12T12:53Z).
+    /// Converts a <see cref="DateTime"/> to and from the ISO 8601 date format (e.g. <c>"2008-04-12T12:53Z"</c>).
     /// </summary>
     public class IsoDateTimeConverter : DateTimeConverterBase
     {
@@ -46,8 +46,8 @@ namespace Newtonsoft.Json.Converters
         /// <value>The date time styles used when converting a date to and from JSON.</value>
         public DateTimeStyles DateTimeStyles
         {
-            get { return _dateTimeStyles; }
-            set { _dateTimeStyles = value; }
+            get => _dateTimeStyles;
+            set => _dateTimeStyles = value;
         }
 
         /// <summary>
@@ -56,8 +56,8 @@ namespace Newtonsoft.Json.Converters
         /// <value>The date time format used when converting a date to and from JSON.</value>
         public string DateTimeFormat
         {
-            get { return _dateTimeFormat ?? string.Empty; }
-            set { _dateTimeFormat = (string.IsNullOrEmpty(value)) ? null : value; }
+            get => _dateTimeFormat ?? string.Empty;
+            set => _dateTimeFormat = (string.IsNullOrEmpty(value)) ? null : value;
         }
 
         /// <summary>
@@ -66,8 +66,8 @@ namespace Newtonsoft.Json.Converters
         /// <value>The culture used when converting a date to and from JSON.</value>
         public CultureInfo Culture
         {
-            get { return _culture ?? CultureInfo.CurrentCulture; }
-            set { _culture = value; }
+            get => _culture ?? CultureInfo.CurrentCulture;
+            set => _culture = value;
         }
 
         /// <summary>
@@ -80,10 +80,8 @@ namespace Newtonsoft.Json.Converters
         {
             string text;
 
-            if (value is DateTime)
+            if (value is DateTime dateTime)
             {
-                DateTime dateTime = (DateTime)value;
-
                 if ((_dateTimeStyles & DateTimeStyles.AdjustToUniversal) == DateTimeStyles.AdjustToUniversal
                     || (_dateTimeStyles & DateTimeStyles.AssumeUniversal) == DateTimeStyles.AssumeUniversal)
                 {
@@ -92,10 +90,9 @@ namespace Newtonsoft.Json.Converters
 
                 text = dateTime.ToString(_dateTimeFormat ?? DefaultDateTimeFormat, Culture);
             }
-#if !NET20
-            else if (value is DateTimeOffset)
+#if HAVE_DATE_TIME_OFFSET
+            else if (value is DateTimeOffset dateTimeOffset)
             {
-                DateTimeOffset dateTimeOffset = (DateTimeOffset)value;
                 if ((_dateTimeStyles & DateTimeStyles.AdjustToUniversal) == DateTimeStyles.AdjustToUniversal
                     || (_dateTimeStyles & DateTimeStyles.AssumeUniversal) == DateTimeStyles.AssumeUniversal)
                 {
@@ -124,15 +121,9 @@ namespace Newtonsoft.Json.Converters
         public override object ReadJson(JsonReader reader, Type objectType, object existingValue, JsonSerializer serializer)
         {
             bool nullable = ReflectionUtils.IsNullableType(objectType);
-#if !NET20
-            Type t = (nullable)
-                ? Nullable.GetUnderlyingType(objectType)
-                : objectType;
-#endif
-
             if (reader.TokenType == JsonToken.Null)
             {
-                if (!ReflectionUtils.IsNullableType(objectType))
+                if (!nullable)
                 {
                     throw JsonSerializationException.Create(reader, "Cannot convert null value to {0}.".FormatWith(CultureInfo.InvariantCulture, objectType));
                 }
@@ -140,18 +131,24 @@ namespace Newtonsoft.Json.Converters
                 return null;
             }
 
+#if HAVE_DATE_TIME_OFFSET
+            Type t = (nullable)
+                ? Nullable.GetUnderlyingType(objectType)
+                : objectType;
+#endif
+
             if (reader.TokenType == JsonToken.Date)
             {
-#if !NET20
+#if HAVE_DATE_TIME_OFFSET
                 if (t == typeof(DateTimeOffset))
                 {
                     return (reader.Value is DateTimeOffset) ? reader.Value : new DateTimeOffset((DateTime)reader.Value);
                 }
 
                 // converter is expected to return a DateTime
-                if (reader.Value is DateTimeOffset)
+                if (reader.Value is DateTimeOffset offset)
                 {
-                    return ((DateTimeOffset)reader.Value).DateTime;
+                    return offset.DateTime;
                 }
 #endif
 
@@ -170,7 +167,7 @@ namespace Newtonsoft.Json.Converters
                 return null;
             }
 
-#if !NET20
+#if HAVE_DATE_TIME_OFFSET
             if (t == typeof(DateTimeOffset))
             {
                 if (!string.IsNullOrEmpty(_dateTimeFormat))

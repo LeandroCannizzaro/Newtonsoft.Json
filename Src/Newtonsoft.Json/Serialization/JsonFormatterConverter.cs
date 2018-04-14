@@ -23,7 +23,7 @@
 // OTHER DEALINGS IN THE SOFTWARE.
 #endregion
 
-#if !(DOTNET || PORTABLE40 || PORTABLE)
+#if HAVE_BINARY_SERIALIZATION
 using System;
 using System.Globalization;
 using System.Runtime.Serialization;
@@ -60,8 +60,7 @@ namespace Newtonsoft.Json.Serialization
         {
             ValidationUtils.ArgumentNotNull(value, nameof(value));
 
-            JToken token = value as JToken;
-            if (token == null)
+            if (!(value is JToken token))
             {
                 throw new ArgumentException("Value is not a JToken.", nameof(value));
             }

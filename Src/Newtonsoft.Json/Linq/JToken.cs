@@ -26,20 +26,19 @@
 using System;
 using System.Collections.Generic;
 using Newtonsoft.Json.Linq.JsonPath;
-#if !(NET35 || NET20 || PORTABLE40)
+#if HAVE_DYNAMIC
 using System.Dynamic;
 using System.Linq.Expressions;
 #endif
 using System.IO;
-#if !(NET20 || NET35 || PORTABLE40 || PORTABLE) || NETSTANDARD1_1
+#if HAVE_BIG_INTEGER
 using System.Numerics;
 #endif
-using System.Text;
 using Newtonsoft.Json.Utilities;
 using System.Diagnostics;
 using System.Globalization;
 using System.Collections;
-#if NET20
+#if !HAVE_LINQ
 using Newtonsoft.Json.Utilities.LinqBridge;
 #else
 using System.Linq;
@@ -51,11 +50,11 @@ namespace Newtonsoft.Json.Linq
     /// <summary>
     /// Represents an abstract JSON token.
     /// </summary>
-    public abstract class JToken : IJEnumerable<JToken>, IJsonLineInfo
-#if !(DOTNET || PORTABLE40 || PORTABLE)
+    public abstract partial class JToken : IJEnumerable<JToken>, IJsonLineInfo
+#if HAVE_ICLONEABLE
         , ICloneable
 #endif
-#if !(NET35 || NET20 || PORTABLE40)
+#if HAVE_DYNAMIC
         , IDynamicMetaObjectProvider
 #endif
     {
@@ -68,7 +67,7 @@ namespace Newtonsoft.Json.Linq
 
         private static readonly JTokenType[] BooleanTypes = new[] { JTokenType.Integer, JTokenType.Float, JTokenType.String, JTokenType.Comment, JTokenType.Raw, JTokenType.Boolean };
         private static readonly JTokenType[] NumberTypes = new[] { JTokenType.Integer, JTokenType.Float, JTokenType.String, JTokenType.Comment, JTokenType.Raw, JTokenType.Boolean };
-#if !(NET20 || NET35 || PORTABLE40 || PORTABLE) || NETSTANDARD1_1
+#if HAVE_BIG_INTEGER
         private static readonly JTokenType[] BigIntegerTypes = new[] { JTokenType.Integer, JTokenType.Float, JTokenType.String, JTokenType.Comment, JTokenType.Raw, JTokenType.Boolean, JTokenType.Bytes };
 #endif
         private static readonly JTokenType[] StringTypes = new[] { JTokenType.Date, JTokenType.Integer, JTokenType.Float, JTokenType.String, JTokenType.Comment, JTokenType.Raw, JTokenType.Boolean, JTokenType.Bytes, JTokenType.Guid, JTokenType.TimeSpan, JTokenType.Uri };
@@ -164,8 +163,8 @@ namespace Newtonsoft.Json.Linq
         /// <value>The <see cref="JToken"/> that contains the next sibling token.</value>
         public JToken Next
         {
-            get { return _next; }
-            internal set { _next = value; }
+            get => _next;
+            internal set => _next = value;
         }
 
         /// <summary>
@@ -174,8 +173,8 @@ namespace Newtonsoft.Json.Linq
         /// <value>The <see cref="JToken"/> that contains the previous sibling token.</value>
         public JToken Previous
         {
-            get { return _previous; }
-            internal set { _previous = value; }
+            get => _previous;
+            internal set => _previous = value;
         }
 
         /// <summary>
@@ -214,7 +213,11 @@ namespace Newtonsoft.Json.Linq
                     previous = current;
                 }
 
+#if HAVE_FAST_REVERSE
+                positions.FastReverse();
+#else
                 positions.Reverse();
+#endif
 
                 return JsonPosition.BuildPath(positions, null);
             }
@@ -315,8 +318,8 @@ namespace Newtonsoft.Json.Linq
         /// <value>The <see cref="JToken"/> with the specified key.</value>
         public virtual JToken this[object key]
         {
-            get { throw new InvalidOperationException("Cannot access child value on {0}.".FormatWith(CultureInfo.InvariantCulture, GetType())); }
-            set { throw new InvalidOperationException("Cannot set child value on {0}.".FormatWith(CultureInfo.InvariantCulture, GetType())); }
+            get => throw new InvalidOperationException("Cannot access child value on {0}.".FormatWith(CultureInfo.InvariantCulture, GetType()));
+            set => throw new InvalidOperationException("Cannot set child value on {0}.".FormatWith(CultureInfo.InvariantCulture, GetType()));
         }
 
         /// <summary>
@@ -337,19 +340,13 @@ namespace Newtonsoft.Json.Linq
         /// Get the first child token of this token.
         /// </summary>
         /// <value>A <see cref="JToken"/> containing the first child token of the <see cref="JToken"/>.</value>
-        public virtual JToken First
-        {
-            get { throw new InvalidOperationException("Cannot access child value on {0}.".FormatWith(CultureInfo.InvariantCulture, GetType())); }
-        }
+        public virtual JToken First => throw new InvalidOperationException("Cannot access child value on {0}.".FormatWith(CultureInfo.InvariantCulture, GetType()));
 
         /// <summary>
         /// Get the last child token of this token.
         /// </summary>
         /// <value>A <see cref="JToken"/> containing the last child token of the <see cref="JToken"/>.</value>
-        public virtual JToken Last
-        {
-            get { throw new InvalidOperationException("Cannot access child value on {0}.".FormatWith(CultureInfo.InvariantCulture, GetType())); }
-        }
+        public virtual JToken Last => throw new InvalidOperationException("Cannot access child value on {0}.".FormatWith(CultureInfo.InvariantCulture, GetType()));
 
         /// <summary>
         /// Returns a collection of the child tokens of this token, in document order.
@@ -428,8 +425,8 @@ namespace Newtonsoft.Json.Linq
         /// <summary>
         /// Returns the JSON for this token using the given formatting and converters.
         /// </summary>
-        /// <param name="formatting">Indicates how the output is formatted.</param>
-        /// <param name="converters">A collection of <see cref="JsonConverter"/> which will be used when writing the token.</param>
+        /// <param name="formatting">Indicates how the output should be formatted.</param>
+        /// <param name="converters">A collection of <see cref="JsonConverter"/>s which will be used when writing the token.</param>
         /// <returns>The JSON for this token using the given formatting and converters.</returns>
         public string ToString(Formatting formatting, params JsonConverter[] converters)
         {
@@ -451,9 +448,9 @@ namespace Newtonsoft.Json.Linq
                 throw new ArgumentNullException(nameof(value));
             }
 
-            if (value is JProperty)
+            if (value is JProperty property)
             {
-                value = ((JProperty)value).Value;
+                value = property.Value;
             }
 
             JValue v = value as JValue;
@@ -478,7 +475,7 @@ namespace Newtonsoft.Json.Linq
             return (Array.IndexOf(validTypes, o.Type) != -1) || (nullable && (o.Type == JTokenType.Null || o.Type == JTokenType.Undefined));
         }
 
-        #region Cast from operators
+#region Cast from operators
         /// <summary>
         /// Performs an explicit conversion from <see cref="Newtonsoft.Json.Linq.JToken"/> to <see cref="System.Boolean"/>.
         /// </summary>
@@ -492,17 +489,17 @@ namespace Newtonsoft.Json.Linq
                 throw new ArgumentException("Can not convert {0} to Boolean.".FormatWith(CultureInfo.InvariantCulture, GetType(value)));
             }
 
-#if !(NET20 || NET35 || PORTABLE40 || PORTABLE) || NETSTANDARD1_1
-            if (v.Value is BigInteger)
+#if HAVE_BIG_INTEGER
+            if (v.Value is BigInteger integer)
             {
-                return Convert.ToBoolean((int)(BigInteger)v.Value);
+                return Convert.ToBoolean((int)integer);
             }
 #endif
 
             return Convert.ToBoolean(v.Value, CultureInfo.InvariantCulture);
         }
 
-#if !NET20
+#if HAVE_DATE_TIME_OFFSET
         /// <summary>
         /// Performs an explicit conversion from <see cref="Newtonsoft.Json.Linq.JToken"/> to <see cref="System.DateTimeOffset"/>.
         /// </summary>
@@ -516,20 +513,22 @@ namespace Newtonsoft.Json.Linq
                 throw new ArgumentException("Can not convert {0} to DateTimeOffset.".FormatWith(CultureInfo.InvariantCulture, GetType(value)));
             }
 
-            if (v.Value is DateTimeOffset)
+            if (v.Value is DateTimeOffset offset)
             {
-                return (DateTimeOffset)v.Value;
+                return offset;
             }
-            if (v.Value is string)
+
+            if (v.Value is string s)
             {
-                return DateTimeOffset.Parse((string)v.Value, CultureInfo.InvariantCulture);
+                return DateTimeOffset.Parse(s, CultureInfo.InvariantCulture);
             }
+
             return new DateTimeOffset(Convert.ToDateTime(v.Value, CultureInfo.InvariantCulture));
         }
 #endif
 
         /// <summary>
-        /// Performs an explicit conversion from <see cref="Newtonsoft.Json.Linq.JToken"/> to <see cref="Nullable{Boolean}"/>.
+        /// Performs an explicit conversion from <see cref="JToken"/> to <see cref="Nullable{T}"/> of <see cref="Boolean"/>.
         /// </summary>
         /// <param name="value">The value.</param>
         /// <returns>The result of the conversion.</returns>
@@ -546,10 +545,10 @@ namespace Newtonsoft.Json.Linq
                 throw new ArgumentException("Can not convert {0} to Boolean.".FormatWith(CultureInfo.InvariantCulture, GetType(value)));
             }
 
-#if !(NET20 || NET35 || PORTABLE40 || PORTABLE) || NETSTANDARD1_1
-            if (v.Value is BigInteger)
+#if HAVE_BIG_INTEGER
+            if (v.Value is BigInteger integer)
             {
-                return Convert.ToBoolean((int)(BigInteger)v.Value);
+                return Convert.ToBoolean((int)integer);
             }
 #endif
 
@@ -557,7 +556,7 @@ namespace Newtonsoft.Json.Linq
         }
 
         /// <summary>
-        /// Performs an explicit conversion from <see cref="Newtonsoft.Json.Linq.JToken"/> to <see cref="System.Int64"/>.
+        /// Performs an explicit conversion from <see cref="JToken"/> to <see cref="Nullable{T}"/> of <see cref="Int64"/>.
         /// </summary>
         /// <param name="value">The value.</param>
         /// <returns>The result of the conversion.</returns>
@@ -569,10 +568,10 @@ namespace Newtonsoft.Json.Linq
                 throw new ArgumentException("Can not convert {0} to Int64.".FormatWith(CultureInfo.InvariantCulture, GetType(value)));
             }
 
-#if !(NET20 || NET35 || PORTABLE40 || PORTABLE) || NETSTANDARD1_1
-            if (v.Value is BigInteger)
+#if HAVE_BIG_INTEGER
+            if (v.Value is BigInteger integer)
             {
-                return (long)(BigInteger)v.Value;
+                return (long)integer;
             }
 #endif
 
@@ -580,7 +579,7 @@ namespace Newtonsoft.Json.Linq
         }
 
         /// <summary>
-        /// Performs an explicit conversion from <see cref="Newtonsoft.Json.Linq.JToken"/> to <see cref="Nullable{DateTime}"/>.
+        /// Performs an explicit conversion from <see cref="JToken"/> to <see cref="Nullable{T}"/> of <see cref="DateTime"/>.
         /// </summary>
         /// <param name="value">The value.</param>
         /// <returns>The result of the conversion.</returns>
@@ -597,19 +596,19 @@ namespace Newtonsoft.Json.Linq
                 throw new ArgumentException("Can not convert {0} to DateTime.".FormatWith(CultureInfo.InvariantCulture, GetType(value)));
             }
 
-#if !NET20
-            if (v.Value is DateTimeOffset)
+#if HAVE_DATE_TIME_OFFSET
+            if (v.Value is DateTimeOffset offset)
             {
-                return ((DateTimeOffset)v.Value).DateTime;
+                return offset.DateTime;
             }
 #endif
 
             return (v.Value != null) ? (DateTime?)Convert.ToDateTime(v.Value, CultureInfo.InvariantCulture) : null;
         }
 
-#if !NET20
+#if HAVE_DATE_TIME_OFFSET
         /// <summary>
-        /// Performs an explicit conversion from <see cref="Newtonsoft.Json.Linq.JToken"/> to <see cref="Nullable{DateTimeOffset}"/>.
+        /// Performs an explicit conversion from <see cref="JToken"/> to <see cref="Nullable{T}"/> of <see cref="DateTimeOffset"/>.
         /// </summary>
         /// <param name="value">The value.</param>
         /// <returns>The result of the conversion.</returns>
@@ -630,20 +629,22 @@ namespace Newtonsoft.Json.Linq
             {
                 return null;
             }
-            if (v.Value is DateTimeOffset)
+            if (v.Value is DateTimeOffset offset)
             {
-                return (DateTimeOffset?)v.Value;
+                return offset;
             }
-            if (v.Value is string)
+
+            if (v.Value is string s)
             {
-                return DateTimeOffset.Parse((string)v.Value, CultureInfo.InvariantCulture);
+                return DateTimeOffset.Parse(s, CultureInfo.InvariantCulture);
             }
+
             return new DateTimeOffset(Convert.ToDateTime(v.Value, CultureInfo.InvariantCulture));
         }
 #endif
 
         /// <summary>
-        /// Performs an explicit conversion from <see cref="Newtonsoft.Json.Linq.JToken"/> to <see cref="Nullable{Decimal}"/>.
+        /// Performs an explicit conversion from <see cref="JToken"/> to <see cref="Nullable{T}"/> of <see cref="Decimal"/>.
         /// </summary>
         /// <param name="value">The value.</param>
         /// <returns>The result of the conversion.</returns>
@@ -660,10 +661,10 @@ namespace Newtonsoft.Json.Linq
                 throw new ArgumentException("Can not convert {0} to Decimal.".FormatWith(CultureInfo.InvariantCulture, GetType(value)));
             }
 
-#if !(NET20 || NET35 || PORTABLE40 || PORTABLE) || NETSTANDARD1_1
-            if (v.Value is BigInteger)
+#if HAVE_BIG_INTEGER
+            if (v.Value is BigInteger integer)
             {
-                return (decimal?)(BigInteger)v.Value;
+                return (decimal?)integer;
             }
 #endif
 
@@ -671,7 +672,7 @@ namespace Newtonsoft.Json.Linq
         }
 
         /// <summary>
-        /// Performs an explicit conversion from <see cref="Newtonsoft.Json.Linq.JToken"/> to <see cref="Nullable{Double}"/>.
+        /// Performs an explicit conversion from <see cref="JToken"/> to <see cref="Nullable{T}"/> of <see cref="Double"/>.
         /// </summary>
         /// <param name="value">The value.</param>
         /// <returns>The result of the conversion.</returns>
@@ -688,10 +689,10 @@ namespace Newtonsoft.Json.Linq
                 throw new ArgumentException("Can not convert {0} to Double.".FormatWith(CultureInfo.InvariantCulture, GetType(value)));
             }
 
-#if !(NET20 || NET35 || PORTABLE40 || PORTABLE) || NETSTANDARD1_1
-            if (v.Value is BigInteger)
+#if HAVE_BIG_INTEGER
+            if (v.Value is BigInteger integer)
             {
-                return (double?)(BigInteger)v.Value;
+                return (double?)integer;
             }
 #endif
 
@@ -699,7 +700,7 @@ namespace Newtonsoft.Json.Linq
         }
 
         /// <summary>
-        /// Performs an explicit conversion from <see cref="Newtonsoft.Json.Linq.JToken"/> to <see cref="Nullable{Char}"/>.
+        /// Performs an explicit conversion from <see cref="JToken"/> to <see cref="Nullable{T}"/> of <see cref="Char"/>.
         /// </summary>
         /// <param name="value">The value.</param>
         /// <returns>The result of the conversion.</returns>
@@ -716,10 +717,10 @@ namespace Newtonsoft.Json.Linq
                 throw new ArgumentException("Can not convert {0} to Char.".FormatWith(CultureInfo.InvariantCulture, GetType(value)));
             }
 
-#if !(NET20 || NET35 || PORTABLE40 || PORTABLE) || NETSTANDARD1_1
-            if (v.Value is BigInteger)
+#if HAVE_BIG_INTEGER
+            if (v.Value is BigInteger integer)
             {
-                return (char?)(BigInteger)v.Value;
+                return (char?)integer;
             }
 #endif
 
@@ -727,7 +728,7 @@ namespace Newtonsoft.Json.Linq
         }
 
         /// <summary>
-        /// Performs an explicit conversion from <see cref="Newtonsoft.Json.Linq.JToken"/> to <see cref="System.Int32"/>.
+        /// Performs an explicit conversion from <see cref="JToken"/> to <see cref="Int32"/>.
         /// </summary>
         /// <param name="value">The value.</param>
         /// <returns>The result of the conversion.</returns>
@@ -739,10 +740,10 @@ namespace Newtonsoft.Json.Linq
                 throw new ArgumentException("Can not convert {0} to Int32.".FormatWith(CultureInfo.InvariantCulture, GetType(value)));
             }
 
-#if !(NET20 || NET35 || PORTABLE40 || PORTABLE) || NETSTANDARD1_1
-            if (v.Value is BigInteger)
+#if HAVE_BIG_INTEGER
+            if (v.Value is BigInteger integer)
             {
-                return (int)(BigInteger)v.Value;
+                return (int)integer;
             }
 #endif
 
@@ -750,7 +751,7 @@ namespace Newtonsoft.Json.Linq
         }
 
         /// <summary>
-        /// Performs an explicit conversion from <see cref="Newtonsoft.Json.Linq.JToken"/> to <see cref="System.Int16"/>.
+        /// Performs an explicit conversion from <see cref="JToken"/> to <see cref="Int16"/>.
         /// </summary>
         /// <param name="value">The value.</param>
         /// <returns>The result of the conversion.</returns>
@@ -762,10 +763,10 @@ namespace Newtonsoft.Json.Linq
                 throw new ArgumentException("Can not convert {0} to Int16.".FormatWith(CultureInfo.InvariantCulture, GetType(value)));
             }
 
-#if !(NET20 || NET35 || PORTABLE40 || PORTABLE) || NETSTANDARD1_1
-            if (v.Value is BigInteger)
+#if HAVE_BIG_INTEGER
+            if (v.Value is BigInteger integer)
             {
-                return (short)(BigInteger)v.Value;
+                return (short)integer;
             }
 #endif
 
@@ -773,7 +774,7 @@ namespace Newtonsoft.Json.Linq
         }
 
         /// <summary>
-        /// Performs an explicit conversion from <see cref="Newtonsoft.Json.Linq.JToken"/> to <see cref="System.UInt16"/>.
+        /// Performs an explicit conversion from <see cref="JToken"/> to <see cref="UInt16"/>.
         /// </summary>
         /// <param name="value">The value.</param>
         /// <returns>The result of the conversion.</returns>
@@ -786,10 +787,10 @@ namespace Newtonsoft.Json.Linq
                 throw new ArgumentException("Can not convert {0} to UInt16.".FormatWith(CultureInfo.InvariantCulture, GetType(value)));
             }
 
-#if !(NET20 || NET35 || PORTABLE40 || PORTABLE) || NETSTANDARD1_1
-            if (v.Value is BigInteger)
+#if HAVE_BIG_INTEGER
+            if (v.Value is BigInteger integer)
             {
-                return (ushort)(BigInteger)v.Value;
+                return (ushort)integer;
             }
 #endif
 
@@ -797,7 +798,7 @@ namespace Newtonsoft.Json.Linq
         }
 
         /// <summary>
-        /// Performs an explicit conversion from <see cref="Newtonsoft.Json.Linq.JToken"/> to <see cref="System.Char"/>.
+        /// Performs an explicit conversion from <see cref="JToken"/> to <see cref="Char"/>.
         /// </summary>
         /// <param name="value">The value.</param>
         /// <returns>The result of the conversion.</returns>
@@ -810,10 +811,10 @@ namespace Newtonsoft.Json.Linq
                 throw new ArgumentException("Can not convert {0} to Char.".FormatWith(CultureInfo.InvariantCulture, GetType(value)));
             }
 
-#if !(NET20 || NET35 || PORTABLE40 || PORTABLE) || NETSTANDARD1_1
-            if (v.Value is BigInteger)
+#if HAVE_BIG_INTEGER
+            if (v.Value is BigInteger integer)
             {
-                return (char)(BigInteger)v.Value;
+                return (char)integer;
             }
 #endif
 
@@ -821,7 +822,7 @@ namespace Newtonsoft.Json.Linq
         }
 
         /// <summary>
-        /// Performs an explicit conversion from <see cref="Newtonsoft.Json.Linq.JToken"/> to <see cref="System.Byte"/>.
+        /// Performs an explicit conversion from <see cref="JToken"/> to <see cref="Byte"/>.
         /// </summary>
         /// <param name="value">The value.</param>
         /// <returns>The result of the conversion.</returns>
@@ -833,10 +834,10 @@ namespace Newtonsoft.Json.Linq
                 throw new ArgumentException("Can not convert {0} to Byte.".FormatWith(CultureInfo.InvariantCulture, GetType(value)));
             }
 
-#if !(NET20 || NET35 || PORTABLE40 || PORTABLE) || NETSTANDARD1_1
-            if (v.Value is BigInteger)
+#if HAVE_BIG_INTEGER
+            if (v.Value is BigInteger integer)
             {
-                return (byte)(BigInteger)v.Value;
+                return (byte)integer;
             }
 #endif
 
@@ -857,10 +858,10 @@ namespace Newtonsoft.Json.Linq
                 throw new ArgumentException("Can not convert {0} to SByte.".FormatWith(CultureInfo.InvariantCulture, GetType(value)));
             }
 
-#if !(NET20 || NET35 || PORTABLE40 || PORTABLE) || NETSTANDARD1_1
-            if (v.Value is BigInteger)
+#if HAVE_BIG_INTEGER
+            if (v.Value is BigInteger integer)
             {
-                return (sbyte)(BigInteger)v.Value;
+                return (sbyte)integer;
             }
 #endif
 
@@ -868,7 +869,7 @@ namespace Newtonsoft.Json.Linq
         }
 
         /// <summary>
-        /// Performs an explicit conversion from <see cref="Newtonsoft.Json.Linq.JToken"/> to <see cref="Nullable{Int32}"/>.
+        /// Performs an explicit conversion from <see cref="JToken"/> to <see cref="Nullable{T}"/> of <see cref="Int32"/> .
         /// </summary>
         /// <param name="value">The value.</param>
         /// <returns>The result of the conversion.</returns>
@@ -885,10 +886,10 @@ namespace Newtonsoft.Json.Linq
                 throw new ArgumentException("Can not convert {0} to Int32.".FormatWith(CultureInfo.InvariantCulture, GetType(value)));
             }
 
-#if !(NET20 || NET35 || PORTABLE40 || PORTABLE) || NETSTANDARD1_1
-            if (v.Value is BigInteger)
+#if HAVE_BIG_INTEGER
+            if (v.Value is BigInteger integer)
             {
-                return (int?)(BigInteger)v.Value;
+                return (int?)integer;
             }
 #endif
 
@@ -896,7 +897,7 @@ namespace Newtonsoft.Json.Linq
         }
 
         /// <summary>
-        /// Performs an explicit conversion from <see cref="Newtonsoft.Json.Linq.JToken"/> to <see cref="Nullable{Int16}"/>.
+        /// Performs an explicit conversion from <see cref="JToken"/> to <see cref="Nullable{T}"/> of <see cref="Int16"/>.
         /// </summary>
         /// <param name="value">The value.</param>
         /// <returns>The result of the conversion.</returns>
@@ -913,10 +914,10 @@ namespace Newtonsoft.Json.Linq
                 throw new ArgumentException("Can not convert {0} to Int16.".FormatWith(CultureInfo.InvariantCulture, GetType(value)));
             }
 
-#if !(NET20 || NET35 || PORTABLE40 || PORTABLE) || NETSTANDARD1_1
-            if (v.Value is BigInteger)
+#if HAVE_BIG_INTEGER
+            if (v.Value is BigInteger integer)
             {
-                return (short?)(BigInteger)v.Value;
+                return (short?)integer;
             }
 #endif
 
@@ -924,7 +925,7 @@ namespace Newtonsoft.Json.Linq
         }
 
         /// <summary>
-        /// Performs an explicit conversion from <see cref="Newtonsoft.Json.Linq.JToken"/> to <see cref="Nullable{UInt16}"/>.
+        /// Performs an explicit conversion from <see cref="JToken"/> to <see cref="Nullable{T}"/> of <see cref="UInt16"/>.
         /// </summary>
         /// <param name="value">The value.</param>
         /// <returns>The result of the conversion.</returns>
@@ -942,10 +943,10 @@ namespace Newtonsoft.Json.Linq
                 throw new ArgumentException("Can not convert {0} to UInt16.".FormatWith(CultureInfo.InvariantCulture, GetType(value)));
             }
 
-#if !(NET20 || NET35 || PORTABLE40 || PORTABLE) || NETSTANDARD1_1
-            if (v.Value is BigInteger)
+#if HAVE_BIG_INTEGER
+            if (v.Value is BigInteger integer)
             {
-                return (ushort?)(BigInteger)v.Value;
+                return (ushort?)integer;
             }
 #endif
 
@@ -953,7 +954,7 @@ namespace Newtonsoft.Json.Linq
         }
 
         /// <summary>
-        /// Performs an explicit conversion from <see cref="Newtonsoft.Json.Linq.JToken"/> to <see cref="Nullable{Byte}"/>.
+        /// Performs an explicit conversion from <see cref="JToken"/> to <see cref="Nullable{T}"/> of <see cref="Byte"/>.
         /// </summary>
         /// <param name="value">The value.</param>
         /// <returns>The result of the conversion.</returns>
@@ -970,10 +971,10 @@ namespace Newtonsoft.Json.Linq
                 throw new ArgumentException("Can not convert {0} to Byte.".FormatWith(CultureInfo.InvariantCulture, GetType(value)));
             }
 
-#if !(NET20 || NET35 || PORTABLE40 || PORTABLE) || NETSTANDARD1_1
-            if (v.Value is BigInteger)
+#if HAVE_BIG_INTEGER
+            if (v.Value is BigInteger integer)
             {
-                return (byte?)(BigInteger)v.Value;
+                return (byte?)integer;
             }
 #endif
 
@@ -981,7 +982,7 @@ namespace Newtonsoft.Json.Linq
         }
 
         /// <summary>
-        /// Performs an explicit conversion from <see cref="Newtonsoft.Json.Linq.JToken"/> to <see cref="Nullable{SByte}"/>.
+        /// Performs an explicit conversion from <see cref="JToken"/> to <see cref="Nullable{T}"/> of <see cref="SByte"/>.
         /// </summary>
         /// <param name="value">The value.</param>
         /// <returns>The result of the conversion.</returns>
@@ -999,10 +1000,10 @@ namespace Newtonsoft.Json.Linq
                 throw new ArgumentException("Can not convert {0} to SByte.".FormatWith(CultureInfo.InvariantCulture, GetType(value)));
             }
 
-#if !(NET20 || NET35 || PORTABLE40 || PORTABLE) || NETSTANDARD1_1
-            if (v.Value is BigInteger)
+#if HAVE_BIG_INTEGER
+            if (v.Value is BigInteger integer)
             {
-                return (sbyte?)(BigInteger)v.Value;
+                return (sbyte?)integer;
             }
 #endif
 
@@ -1010,7 +1011,7 @@ namespace Newtonsoft.Json.Linq
         }
 
         /// <summary>
-        /// Performs an explicit conversion from <see cref="Newtonsoft.Json.Linq.JToken"/> to <see cref="System.DateTime"/>.
+        /// Performs an explicit conversion from <see cref="JToken"/> to <see cref="Nullable{T}"/> of <see cref="DateTime"/>.
         /// </summary>
         /// <param name="value">The value.</param>
         /// <returns>The result of the conversion.</returns>
@@ -1022,10 +1023,10 @@ namespace Newtonsoft.Json.Linq
                 throw new ArgumentException("Can not convert {0} to DateTime.".FormatWith(CultureInfo.InvariantCulture, GetType(value)));
             }
 
-#if !NET20
-            if (v.Value is DateTimeOffset)
+#if HAVE_DATE_TIME_OFFSET
+            if (v.Value is DateTimeOffset offset)
             {
-                return ((DateTimeOffset)v.Value).DateTime;
+                return offset.DateTime;
             }
 #endif
 
@@ -1033,7 +1034,7 @@ namespace Newtonsoft.Json.Linq
         }
 
         /// <summary>
-        /// Performs an explicit conversion from <see cref="Newtonsoft.Json.Linq.JToken"/> to <see cref="Nullable{Int64}"/>.
+        /// Performs an explicit conversion from <see cref="JToken"/> to <see cref="Nullable{T}"/> of <see cref="Int64"/>.
         /// </summary>
         /// <param name="value">The value.</param>
         /// <returns>The result of the conversion.</returns>
@@ -1050,10 +1051,10 @@ namespace Newtonsoft.Json.Linq
                 throw new ArgumentException("Can not convert {0} to Int64.".FormatWith(CultureInfo.InvariantCulture, GetType(value)));
             }
 
-#if !(NET20 || NET35 || PORTABLE40 || PORTABLE) || NETSTANDARD1_1
-            if (v.Value is BigInteger)
+#if HAVE_BIG_INTEGER
+            if (v.Value is BigInteger integer)
             {
-                return (long?)(BigInteger)v.Value;
+                return (long?)integer;
             }
 #endif
 
@@ -1061,7 +1062,7 @@ namespace Newtonsoft.Json.Linq
         }
 
         /// <summary>
-        /// Performs an explicit conversion from <see cref="Newtonsoft.Json.Linq.JToken"/> to <see cref="Nullable{Single}"/>.
+        /// Performs an explicit conversion from <see cref="JToken"/> to <see cref="Nullable{T}"/> of <see cref="Single"/>.
         /// </summary>
         /// <param name="value">The value.</param>
         /// <returns>The result of the conversion.</returns>
@@ -1078,10 +1079,10 @@ namespace Newtonsoft.Json.Linq
                 throw new ArgumentException("Can not convert {0} to Single.".FormatWith(CultureInfo.InvariantCulture, GetType(value)));
             }
 
-#if !(NET20 || NET35 || PORTABLE40 || PORTABLE) || NETSTANDARD1_1
-            if (v.Value is BigInteger)
+#if HAVE_BIG_INTEGER
+            if (v.Value is BigInteger integer)
             {
-                return (float?)(BigInteger)v.Value;
+                return (float?)integer;
             }
 #endif
 
@@ -1089,7 +1090,7 @@ namespace Newtonsoft.Json.Linq
         }
 
         /// <summary>
-        /// Performs an explicit conversion from <see cref="Newtonsoft.Json.Linq.JToken"/> to <see cref="System.Decimal"/>.
+        /// Performs an explicit conversion from <see cref="JToken"/> to <see cref="Decimal"/>.
         /// </summary>
         /// <param name="value">The value.</param>
         /// <returns>The result of the conversion.</returns>
@@ -1101,10 +1102,10 @@ namespace Newtonsoft.Json.Linq
                 throw new ArgumentException("Can not convert {0} to Decimal.".FormatWith(CultureInfo.InvariantCulture, GetType(value)));
             }
 
-#if !(NET20 || NET35 || PORTABLE40 || PORTABLE) || NETSTANDARD1_1
-            if (v.Value is BigInteger)
+#if HAVE_BIG_INTEGER
+            if (v.Value is BigInteger integer)
             {
-                return (decimal)(BigInteger)v.Value;
+                return (decimal)integer;
             }
 #endif
 
@@ -1112,7 +1113,7 @@ namespace Newtonsoft.Json.Linq
         }
 
         /// <summary>
-        /// Performs an explicit conversion from <see cref="Newtonsoft.Json.Linq.JToken"/> to <see cref="Nullable{UInt32}"/>.
+        /// Performs an explicit conversion from <see cref="JToken"/> to <see cref="Nullable{T}"/> of <see cref="UInt32"/>.
         /// </summary>
         /// <param name="value">The value.</param>
         /// <returns>The result of the conversion.</returns>
@@ -1130,10 +1131,10 @@ namespace Newtonsoft.Json.Linq
                 throw new ArgumentException("Can not convert {0} to UInt32.".FormatWith(CultureInfo.InvariantCulture, GetType(value)));
             }
 
-#if !(NET20 || NET35 || PORTABLE40 || PORTABLE) || NETSTANDARD1_1
-            if (v.Value is BigInteger)
+#if HAVE_BIG_INTEGER
+            if (v.Value is BigInteger integer)
             {
-                return (uint?)(BigInteger)v.Value;
+                return (uint?)integer;
             }
 #endif
 
@@ -1141,7 +1142,7 @@ namespace Newtonsoft.Json.Linq
         }
 
         /// <summary>
-        /// Performs an explicit conversion from <see cref="Newtonsoft.Json.Linq.JToken"/> to <see cref="Nullable{UInt64}"/>.
+        /// Performs an explicit conversion from <see cref="JToken"/> to <see cref="Nullable{T}"/> of <see cref="UInt64"/>.
         /// </summary>
         /// <param name="value">The value.</param>
         /// <returns>The result of the conversion.</returns>
@@ -1159,10 +1160,10 @@ namespace Newtonsoft.Json.Linq
                 throw new ArgumentException("Can not convert {0} to UInt64.".FormatWith(CultureInfo.InvariantCulture, GetType(value)));
             }
 
-#if !(NET20 || NET35 || PORTABLE40 || PORTABLE) || NETSTANDARD1_1
-            if (v.Value is BigInteger)
+#if HAVE_BIG_INTEGER
+            if (v.Value is BigInteger integer)
             {
-                return (ulong?)(BigInteger)v.Value;
+                return (ulong?)integer;
             }
 #endif
 
@@ -1170,7 +1171,7 @@ namespace Newtonsoft.Json.Linq
         }
 
         /// <summary>
-        /// Performs an explicit conversion from <see cref="Newtonsoft.Json.Linq.JToken"/> to <see cref="System.Double"/>.
+        /// Performs an explicit conversion from <see cref="JToken"/> to <see cref="Double"/>.
         /// </summary>
         /// <param name="value">The value.</param>
         /// <returns>The result of the conversion.</returns>
@@ -1182,10 +1183,10 @@ namespace Newtonsoft.Json.Linq
                 throw new ArgumentException("Can not convert {0} to Double.".FormatWith(CultureInfo.InvariantCulture, GetType(value)));
             }
 
-#if !(NET20 || NET35 || PORTABLE40 || PORTABLE) || NETSTANDARD1_1
-            if (v.Value is BigInteger)
+#if HAVE_BIG_INTEGER
+            if (v.Value is BigInteger integer)
             {
-                return (double)(BigInteger)v.Value;
+                return (double)integer;
             }
 #endif
 
@@ -1193,7 +1194,7 @@ namespace Newtonsoft.Json.Linq
         }
 
         /// <summary>
-        /// Performs an explicit conversion from <see cref="Newtonsoft.Json.Linq.JToken"/> to <see cref="System.Single"/>.
+        /// Performs an explicit conversion from <see cref="JToken"/> to <see cref="Single"/>.
         /// </summary>
         /// <param name="value">The value.</param>
         /// <returns>The result of the conversion.</returns>
@@ -1205,10 +1206,10 @@ namespace Newtonsoft.Json.Linq
                 throw new ArgumentException("Can not convert {0} to Single.".FormatWith(CultureInfo.InvariantCulture, GetType(value)));
             }
 
-#if !(NET20 || NET35 || PORTABLE40 || PORTABLE) || NETSTANDARD1_1
-            if (v.Value is BigInteger)
+#if HAVE_BIG_INTEGER
+            if (v.Value is BigInteger integer)
             {
-                return (float)(BigInteger)v.Value;
+                return (float)integer;
             }
 #endif
 
@@ -1216,7 +1217,7 @@ namespace Newtonsoft.Json.Linq
         }
 
         /// <summary>
-        /// Performs an explicit conversion from <see cref="Newtonsoft.Json.Linq.JToken"/> to <see cref="System.String"/>.
+        /// Performs an explicit conversion from <see cref="JToken"/> to <see cref="String"/>.
         /// </summary>
         /// <param name="value">The value.</param>
         /// <returns>The result of the conversion.</returns>
@@ -1237,14 +1238,16 @@ namespace Newtonsoft.Json.Linq
             {
                 return null;
             }
-            if (v.Value is byte[])
+
+            if (v.Value is byte[] bytes)
             {
-                return Convert.ToBase64String((byte[])v.Value);
+                return Convert.ToBase64String(bytes);
             }
-#if !(NET20 || NET35 || PORTABLE40 || PORTABLE) || NETSTANDARD1_1
-            if (v.Value is BigInteger)
+
+#if HAVE_BIG_INTEGER
+            if (v.Value is BigInteger integer)
             {
-                return ((BigInteger)v.Value).ToString(CultureInfo.InvariantCulture);
+                return integer.ToString(CultureInfo.InvariantCulture);
             }
 #endif
 
@@ -1252,7 +1255,7 @@ namespace Newtonsoft.Json.Linq
         }
 
         /// <summary>
-        /// Performs an explicit conversion from <see cref="Newtonsoft.Json.Linq.JToken"/> to <see cref="System.UInt32"/>.
+        /// Performs an explicit conversion from <see cref="JToken"/> to <see cref="UInt32"/>.
         /// </summary>
         /// <param name="value">The value.</param>
         /// <returns>The result of the conversion.</returns>
@@ -1265,10 +1268,10 @@ namespace Newtonsoft.Json.Linq
                 throw new ArgumentException("Can not convert {0} to UInt32.".FormatWith(CultureInfo.InvariantCulture, GetType(value)));
             }
 
-#if !(NET20 || NET35 || PORTABLE40 || PORTABLE) || NETSTANDARD1_1
-            if (v.Value is BigInteger)
+#if HAVE_BIG_INTEGER
+            if (v.Value is BigInteger integer)
             {
-                return (uint)(BigInteger)v.Value;
+                return (uint)integer;
             }
 #endif
 
@@ -1289,10 +1292,10 @@ namespace Newtonsoft.Json.Linq
                 throw new ArgumentException("Can not convert {0} to UInt64.".FormatWith(CultureInfo.InvariantCulture, GetType(value)));
             }
 
-#if !(NET20 || NET35 || PORTABLE40 || PORTABLE) || NETSTANDARD1_1
-            if (v.Value is BigInteger)
+#if HAVE_BIG_INTEGER
+            if (v.Value is BigInteger integer)
             {
-                return (ulong)(BigInteger)v.Value;
+                return (ulong)integer;
             }
 #endif
 
@@ -1300,7 +1303,7 @@ namespace Newtonsoft.Json.Linq
         }
 
         /// <summary>
-        /// Performs an explicit conversion from <see cref="Newtonsoft.Json.Linq.JToken"/> to <see cref="Byte"/>[].
+        /// Performs an explicit conversion from <see cref="JToken"/> to <see cref="Byte"/>[].
         /// </summary>
         /// <param name="value">The value.</param>
         /// <returns>The result of the conversion.</returns>
@@ -1321,23 +1324,23 @@ namespace Newtonsoft.Json.Linq
             {
                 return Convert.FromBase64String(Convert.ToString(v.Value, CultureInfo.InvariantCulture));
             }
-#if !(NET20 || NET35 || PORTABLE40 || PORTABLE) || NETSTANDARD1_1
-            if (v.Value is BigInteger)
+#if HAVE_BIG_INTEGER
+            if (v.Value is BigInteger integer)
             {
-                return ((BigInteger)v.Value).ToByteArray();
+                return integer.ToByteArray();
             }
 #endif
 
-            if (v.Value is byte[])
+            if (v.Value is byte[] bytes)
             {
-                return (byte[])v.Value;
+                return bytes;
             }
 
             throw new ArgumentException("Can not convert {0} to byte array.".FormatWith(CultureInfo.InvariantCulture, GetType(value)));
         }
 
         /// <summary>
-        /// Performs an explicit conversion from <see cref="Newtonsoft.Json.Linq.JToken"/> to <see cref="System.Guid"/>.
+        /// Performs an explicit conversion from <see cref="JToken"/> to <see cref="Guid"/>.
         /// </summary>
         /// <param name="value">The value.</param>
         /// <returns>The result of the conversion.</returns>
@@ -1349,16 +1352,16 @@ namespace Newtonsoft.Json.Linq
                 throw new ArgumentException("Can not convert {0} to Guid.".FormatWith(CultureInfo.InvariantCulture, GetType(value)));
             }
 
-            if (v.Value is byte[])
+            if (v.Value is byte[] bytes)
             {
-                return new Guid((byte[])v.Value);
+                return new Guid(bytes);
             }
 
-            return (v.Value is Guid) ? (Guid)v.Value : new Guid(Convert.ToString(v.Value, CultureInfo.InvariantCulture));
+            return (v.Value is Guid guid) ? guid : new Guid(Convert.ToString(v.Value, CultureInfo.InvariantCulture));
         }
 
         /// <summary>
-        /// Performs an explicit conversion from <see cref="Newtonsoft.Json.Linq.JToken"/> to <see cref="System.Guid"/>.
+        /// Performs an explicit conversion from <see cref="JToken"/> to <see cref="Nullable{T}"/> of <see cref="Guid"/> .
         /// </summary>
         /// <param name="value">The value.</param>
         /// <returns>The result of the conversion.</returns>
@@ -1380,16 +1383,16 @@ namespace Newtonsoft.Json.Linq
                 return null;
             }
 
-            if (v.Value is byte[])
+            if (v.Value is byte[] bytes)
             {
-                return new Guid((byte[])v.Value);
+                return new Guid(bytes);
             }
 
-            return (v.Value is Guid) ? (Guid)v.Value : new Guid(Convert.ToString(v.Value, CultureInfo.InvariantCulture));
+            return (v.Value is Guid guid) ? guid : new Guid(Convert.ToString(v.Value, CultureInfo.InvariantCulture));
         }
 
         /// <summary>
-        /// Performs an explicit conversion from <see cref="Newtonsoft.Json.Linq.JToken"/> to <see cref="System.TimeSpan"/>.
+        /// Performs an explicit conversion from <see cref="JToken"/> to <see cref="TimeSpan"/>.
         /// </summary>
         /// <param name="value">The value.</param>
         /// <returns>The result of the conversion.</returns>
@@ -1401,11 +1404,11 @@ namespace Newtonsoft.Json.Linq
                 throw new ArgumentException("Can not convert {0} to TimeSpan.".FormatWith(CultureInfo.InvariantCulture, GetType(value)));
             }
 
-            return (v.Value is TimeSpan) ? (TimeSpan)v.Value : ConvertUtils.ParseTimeSpan(Convert.ToString(v.Value, CultureInfo.InvariantCulture));
+            return (v.Value is TimeSpan span) ? span : ConvertUtils.ParseTimeSpan(Convert.ToString(v.Value, CultureInfo.InvariantCulture));
         }
 
         /// <summary>
-        /// Performs an explicit conversion from <see cref="Newtonsoft.Json.Linq.JToken"/> to <see cref="System.TimeSpan"/>.
+        /// Performs an explicit conversion from <see cref="JToken"/> to <see cref="Nullable{T}"/> of <see cref="TimeSpan"/>.
         /// </summary>
         /// <param name="value">The value.</param>
         /// <returns>The result of the conversion.</returns>
@@ -1427,11 +1430,11 @@ namespace Newtonsoft.Json.Linq
                 return null;
             }
 
-            return (v.Value is TimeSpan) ? (TimeSpan)v.Value : ConvertUtils.ParseTimeSpan(Convert.ToString(v.Value, CultureInfo.InvariantCulture));
+            return (v.Value is TimeSpan span) ? span : ConvertUtils.ParseTimeSpan(Convert.ToString(v.Value, CultureInfo.InvariantCulture));
         }
 
         /// <summary>
-        /// Performs an explicit conversion from <see cref="Newtonsoft.Json.Linq.JToken"/> to <see cref="System.Uri"/>.
+        /// Performs an explicit conversion from <see cref="JToken"/> to <see cref="Uri"/>.
         /// </summary>
         /// <param name="value">The value.</param>
         /// <returns>The result of the conversion.</returns>
@@ -1453,10 +1456,10 @@ namespace Newtonsoft.Json.Linq
                 return null;
             }
 
-            return (v.Value is Uri) ? (Uri)v.Value : new Uri(Convert.ToString(v.Value, CultureInfo.InvariantCulture));
+            return (v.Value is Uri uri) ? uri : new Uri(Convert.ToString(v.Value, CultureInfo.InvariantCulture));
         }
 
-#if !(NET20 || NET35 || PORTABLE40 || PORTABLE) || NETSTANDARD1_1
+#if HAVE_BIG_INTEGER
         private static BigInteger ToBigInteger(JToken value)
         {
             JValue v = EnsureValue(value);
@@ -1484,9 +1487,9 @@ namespace Newtonsoft.Json.Linq
             return ConvertUtils.ToBigInteger(v.Value);
         }
 #endif
-        #endregion
+#endregion
 
-        #region Cast to operators
+#region Cast to operators
         /// <summary>
         /// Performs an implicit conversion from <see cref="Boolean"/> to <see cref="JToken"/>.
         /// </summary>
@@ -1497,7 +1500,7 @@ namespace Newtonsoft.Json.Linq
             return new JValue(value);
         }
 
-#if !NET20
+#if HAVE_DATE_TIME_OFFSET
         /// <summary>
         /// Performs an implicit conversion from <see cref="DateTimeOffset"/> to <see cref="JToken"/>.
         /// </summary>
@@ -1520,7 +1523,7 @@ namespace Newtonsoft.Json.Linq
         }
 
         /// <summary>
-        /// Performs an implicit conversion from <see cref="Nullable{Byte}"/> to <see cref="JToken"/>.
+        /// Performs an implicit conversion from <see cref="Nullable{T}"/> of <see cref="Byte"/> to <see cref="JToken"/>.
         /// </summary>
         /// <param name="value">The value to create a <see cref="JValue"/> from.</param>
         /// <returns>The <see cref="JValue"/> initialized with the specified value.</returns>
@@ -1541,7 +1544,7 @@ namespace Newtonsoft.Json.Linq
         }
 
         /// <summary>
-        /// Performs an implicit conversion from <see cref="Nullable{SByte}"/> to <see cref="JToken"/>.
+        /// Performs an implicit conversion from <see cref="Nullable{T}"/> of <see cref="SByte"/> to <see cref="JToken"/>.
         /// </summary>
         /// <param name="value">The value to create a <see cref="JValue"/> from.</param>
         /// <returns>The <see cref="JValue"/> initialized with the specified value.</returns>
@@ -1552,7 +1555,7 @@ namespace Newtonsoft.Json.Linq
         }
 
         /// <summary>
-        /// Performs an implicit conversion from <see cref="Nullable{Boolean}"/> to <see cref="JToken"/>.
+        /// Performs an implicit conversion from <see cref="Nullable{T}"/> of <see cref="Boolean"/> to <see cref="JToken"/>.
         /// </summary>
         /// <param name="value">The value to create a <see cref="JValue"/> from.</param>
         /// <returns>The <see cref="JValue"/> initialized with the specified value.</returns>
@@ -1562,7 +1565,7 @@ namespace Newtonsoft.Json.Linq
         }
 
         /// <summary>
-        /// Performs an implicit conversion from <see cref="Nullable{Int64}"/> to <see cref="JToken"/>.
+        /// Performs an implicit conversion from <see cref="Nullable{T}"/> of <see cref="Int64"/> to <see cref="JToken"/>.
         /// </summary>
         /// <param name="value">The value to create a <see cref="JValue"/> from.</param>
         /// <returns>The <see cref="JValue"/> initialized with the specified value.</returns>
@@ -1572,7 +1575,7 @@ namespace Newtonsoft.Json.Linq
         }
 
         /// <summary>
-        /// Performs an implicit conversion from <see cref="Nullable{DateTime}"/> to <see cref="JToken"/>.
+        /// Performs an implicit conversion from <see cref="Nullable{T}"/> of <see cref="DateTime"/> to <see cref="JToken"/>.
         /// </summary>
         /// <param name="value">The value to create a <see cref="JValue"/> from.</param>
         /// <returns>The <see cref="JValue"/> initialized with the specified value.</returns>
@@ -1581,9 +1584,9 @@ namespace Newtonsoft.Json.Linq
             return new JValue(value);
         }
 
-#if !NET20
+#if HAVE_DATE_TIME_OFFSET
         /// <summary>
-        /// Performs an implicit conversion from <see cref="Nullable{DateTimeOffset}"/> to <see cref="JToken"/>.
+        /// Performs an implicit conversion from <see cref="Nullable{T}"/> of <see cref="DateTimeOffset"/> to <see cref="JToken"/>.
         /// </summary>
         /// <param name="value">The value to create a <see cref="JValue"/> from.</param>
         /// <returns>The <see cref="JValue"/> initialized with the specified value.</returns>
@@ -1594,7 +1597,7 @@ namespace Newtonsoft.Json.Linq
 #endif
 
         /// <summary>
-        /// Performs an implicit conversion from <see cref="Nullable{Decimal}"/> to <see cref="JToken"/>.
+        /// Performs an implicit conversion from <see cref="Nullable{T}"/> of <see cref="Decimal"/> to <see cref="JToken"/>.
         /// </summary>
         /// <param name="value">The value to create a <see cref="JValue"/> from.</param>
         /// <returns>The <see cref="JValue"/> initialized with the specified value.</returns>
@@ -1604,7 +1607,7 @@ namespace Newtonsoft.Json.Linq
         }
 
         /// <summary>
-        /// Performs an implicit conversion from <see cref="Nullable{Double}"/> to <see cref="JToken"/>.
+        /// Performs an implicit conversion from <see cref="Nullable{T}"/> of <see cref="Double"/> to <see cref="JToken"/>.
         /// </summary>
         /// <param name="value">The value to create a <see cref="JValue"/> from.</param>
         /// <returns>The <see cref="JValue"/> initialized with the specified value.</returns>
@@ -1646,7 +1649,7 @@ namespace Newtonsoft.Json.Linq
         }
 
         /// <summary>
-        /// Performs an implicit conversion from <see cref="Nullable{Int32}"/> to <see cref="JToken"/>.
+        /// Performs an implicit conversion from <see cref="Nullable{T}"/> of <see cref="Int32"/> to <see cref="JToken"/>.
         /// </summary>
         /// <param name="value">The value to create a <see cref="JValue"/> from.</param>
         /// <returns>The <see cref="JValue"/> initialized with the specified value.</returns>
@@ -1666,7 +1669,7 @@ namespace Newtonsoft.Json.Linq
         }
 
         /// <summary>
-        /// Performs an implicit conversion from <see cref="Nullable{Int64}"/> to <see cref="JToken"/>.
+        /// Performs an implicit conversion from <see cref="Nullable{T}"/> of <see cref="Int64"/> to <see cref="JToken"/>.
         /// </summary>
         /// <param name="value">The value to create a <see cref="JValue"/> from.</param>
         /// <returns>The <see cref="JValue"/> initialized with the specified value.</returns>
@@ -1676,7 +1679,7 @@ namespace Newtonsoft.Json.Linq
         }
 
         /// <summary>
-        /// Performs an implicit conversion from <see cref="Nullable{Single}"/> to <see cref="JToken"/>.
+        /// Performs an implicit conversion from <see cref="Nullable{T}"/> of <see cref="Single"/> to <see cref="JToken"/>.
         /// </summary>
         /// <param name="value">The value to create a <see cref="JValue"/> from.</param>
         /// <returns>The <see cref="JValue"/> initialized with the specified value.</returns>
@@ -1696,7 +1699,7 @@ namespace Newtonsoft.Json.Linq
         }
 
         /// <summary>
-        /// Performs an implicit conversion from <see cref="Nullable{Int16}"/> to <see cref="JToken"/>.
+        /// Performs an implicit conversion from <see cref="Nullable{T}"/> of <see cref="Int16"/> to <see cref="JToken"/>.
         /// </summary>
         /// <param name="value">The value to create a <see cref="JValue"/> from.</param>
         /// <returns>The <see cref="JValue"/> initialized with the specified value.</returns>
@@ -1707,7 +1710,7 @@ namespace Newtonsoft.Json.Linq
         }
 
         /// <summary>
-        /// Performs an implicit conversion from <see cref="Nullable{UInt16}"/> to <see cref="JToken"/>.
+        /// Performs an implicit conversion from <see cref="Nullable{T}"/> of <see cref="UInt16"/> to <see cref="JToken"/>.
         /// </summary>
         /// <param name="value">The value to create a <see cref="JValue"/> from.</param>
         /// <returns>The <see cref="JValue"/> initialized with the specified value.</returns>
@@ -1718,7 +1721,7 @@ namespace Newtonsoft.Json.Linq
         }
 
         /// <summary>
-        /// Performs an implicit conversion from <see cref="Nullable{UInt32}"/> to <see cref="JToken"/>.
+        /// Performs an implicit conversion from <see cref="Nullable{T}"/> of <see cref="UInt32"/> to <see cref="JToken"/>.
         /// </summary>
         /// <param name="value">The value to create a <see cref="JValue"/> from.</param>
         /// <returns>The <see cref="JValue"/> initialized with the specified value.</returns>
@@ -1729,7 +1732,7 @@ namespace Newtonsoft.Json.Linq
         }
 
         /// <summary>
-        /// Performs an implicit conversion from <see cref="Nullable{UInt64}"/> to <see cref="JToken"/>.
+        /// Performs an implicit conversion from <see cref="Nullable{T}"/> of <see cref="UInt64"/> to <see cref="JToken"/>.
         /// </summary>
         /// <param name="value">The value to create a <see cref="JValue"/> from.</param>
         /// <returns>The <see cref="JValue"/> initialized with the specified value.</returns>
@@ -1792,7 +1795,7 @@ namespace Newtonsoft.Json.Linq
         }
 
         /// <summary>
-        /// Performs an implicit conversion from <see cref="Byte"/>[] to <see cref="Newtonsoft.Json.Linq.JToken"/>.
+        /// Performs an implicit conversion from <see cref="Byte"/>[] to <see cref="JToken"/>.
         /// </summary>
         /// <param name="value">The value to create a <see cref="JValue"/> from.</param>
         /// <returns>The <see cref="JValue"/> initialized with the specified value.</returns>
@@ -1802,7 +1805,7 @@ namespace Newtonsoft.Json.Linq
         }
 
         /// <summary>
-        /// Performs an implicit conversion from <see cref="T:System.Uri"/> to <see cref="Newtonsoft.Json.Linq.JToken"/>.
+        /// Performs an implicit conversion from <see cref="Uri"/> to <see cref="JToken"/>.
         /// </summary>
         /// <param name="value">The value to create a <see cref="JValue"/> from.</param>
         /// <returns>The <see cref="JValue"/> initialized with the specified value.</returns>
@@ -1812,7 +1815,7 @@ namespace Newtonsoft.Json.Linq
         }
 
         /// <summary>
-        /// Performs an implicit conversion from <see cref="T:System.TimeSpan"/> to <see cref="Newtonsoft.Json.Linq.JToken"/>.
+        /// Performs an implicit conversion from <see cref="TimeSpan"/> to <see cref="JToken"/>.
         /// </summary>
         /// <param name="value">The value to create a <see cref="JValue"/> from.</param>
         /// <returns>The <see cref="JValue"/> initialized with the specified value.</returns>
@@ -1822,7 +1825,7 @@ namespace Newtonsoft.Json.Linq
         }
 
         /// <summary>
-        /// Performs an implicit conversion from <see cref="Nullable{TimeSpan}"/> to <see cref="Newtonsoft.Json.Linq.JToken"/>.
+        /// Performs an implicit conversion from <see cref="Nullable{T}"/> of <see cref="TimeSpan"/> to <see cref="JToken"/>.
         /// </summary>
         /// <param name="value">The value to create a <see cref="JValue"/> from.</param>
         /// <returns>The <see cref="JValue"/> initialized with the specified value.</returns>
@@ -1832,7 +1835,7 @@ namespace Newtonsoft.Json.Linq
         }
 
         /// <summary>
-        /// Performs an implicit conversion from <see cref="T:System.Guid"/> to <see cref="Newtonsoft.Json.Linq.JToken"/>.
+        /// Performs an implicit conversion from <see cref="Guid"/> to <see cref="JToken"/>.
         /// </summary>
         /// <param name="value">The value to create a <see cref="JValue"/> from.</param>
         /// <returns>The <see cref="JValue"/> initialized with the specified value.</returns>
@@ -1842,7 +1845,7 @@ namespace Newtonsoft.Json.Linq
         }
 
         /// <summary>
-        /// Performs an implicit conversion from <see cref="Nullable{Guid}"/> to <see cref="Newtonsoft.Json.Linq.JToken"/>.
+        /// Performs an implicit conversion from <see cref="Nullable{T}"/> of <see cref="Guid"/> to <see cref="JToken"/>.
         /// </summary>
         /// <param name="value">The value to create a <see cref="JValue"/> from.</param>
         /// <returns>The <see cref="JValue"/> initialized with the specified value.</returns>
@@ -1850,7 +1853,7 @@ namespace Newtonsoft.Json.Linq
         {
             return new JValue(value);
         }
-        #endregion
+#endregion
 
         IEnumerator IEnumerable.GetEnumerator()
         {
@@ -1864,15 +1867,12 @@ namespace Newtonsoft.Json.Linq
 
         internal abstract int GetDeepHashCode();
 
-        IJEnumerable<JToken> IJEnumerable<JToken>.this[object key]
-        {
-            get { return this[key]; }
-        }
+        IJEnumerable<JToken> IJEnumerable<JToken>.this[object key] => this[key];
 
         /// <summary>
-        /// Creates an <see cref="JsonReader"/> for this token.
+        /// Creates a <see cref="JsonReader"/> for this token.
         /// </summary>
-        /// <returns>An <see cref="JsonReader"/> that can be used to read this token and its descendants.</returns>
+        /// <returns>A <see cref="JsonReader"/> that can be used to read this token and its descendants.</returns>
         public JsonReader CreateReader()
         {
             return new JTokenReader(this);
@@ -1897,7 +1897,7 @@ namespace Newtonsoft.Json.Linq
         /// Creates a <see cref="JToken"/> from an object.
         /// </summary>
         /// <param name="o">The object that will be used to create <see cref="JToken"/>.</param>
-        /// <returns>A <see cref="JToken"/> with the value of the specified object</returns>
+        /// <returns>A <see cref="JToken"/> with the value of the specified object.</returns>
         public static JToken FromObject(object o)
         {
             return FromObjectInternal(o, JsonSerializer.CreateDefault());
@@ -1908,14 +1908,14 @@ namespace Newtonsoft.Json.Linq
         /// </summary>
         /// <param name="o">The object that will be used to create <see cref="JToken"/>.</param>
         /// <param name="jsonSerializer">The <see cref="JsonSerializer"/> that will be used when reading the object.</param>
-        /// <returns>A <see cref="JToken"/> with the value of the specified object</returns>
+        /// <returns>A <see cref="JToken"/> with the value of the specified object.</returns>
         public static JToken FromObject(object o, JsonSerializer jsonSerializer)
         {
             return FromObjectInternal(o, jsonSerializer);
         }
 
         /// <summary>
-        /// Creates the specified .NET type from the <see cref="JToken"/>.
+        /// Creates an instance of the specified .NET type from the <see cref="JToken"/>.
         /// </summary>
         /// <typeparam name="T">The object type that the token will be deserialized to.</typeparam>
         /// <returns>The new object created from the JSON value.</returns>
@@ -1925,7 +1925,7 @@ namespace Newtonsoft.Json.Linq
         }
 
         /// <summary>
-        /// Creates the specified .NET type from the <see cref="JToken"/>.
+        /// Creates an instance of the specified .NET type from the <see cref="JToken"/>.
         /// </summary>
         /// <param name="objectType">The object type that the token will be deserialized to.</param>
         /// <returns>The new object created from the JSON value.</returns>
@@ -1933,8 +1933,7 @@ namespace Newtonsoft.Json.Linq
         {
             if (JsonConvert.DefaultSettings == null)
             {
-                bool isEnum;
-                PrimitiveTypeCode typeCode = ConvertUtils.GetTypeCode(objectType, out isEnum);
+                PrimitiveTypeCode typeCode = ConvertUtils.GetTypeCode(objectType, out bool isEnum);
 
                 if (isEnum)
                 {
@@ -2017,7 +2016,7 @@ namespace Newtonsoft.Json.Linq
                         return (DateTime?)this;
                     case PrimitiveTypeCode.DateTime:
                         return (DateTime)this;
-#if !NET20
+#if HAVE_DATE_TIME_OFFSET
                     case PrimitiveTypeCode.DateTimeOffsetNullable:
                         return (DateTimeOffset?)this;
                     case PrimitiveTypeCode.DateTimeOffset:
@@ -2035,7 +2034,7 @@ namespace Newtonsoft.Json.Linq
                         return (TimeSpan?)this;
                     case PrimitiveTypeCode.TimeSpan:
                         return (TimeSpan)this;
-#if !(NET20 || NET35 || PORTABLE40 || PORTABLE) || NETSTANDARD1_1
+#if HAVE_BIG_INTEGER
                     case PrimitiveTypeCode.BigIntegerNullable:
                         return ToBigIntegerNullable(this);
                     case PrimitiveTypeCode.BigInteger:
@@ -2048,7 +2047,7 @@ namespace Newtonsoft.Json.Linq
         }
 
         /// <summary>
-        /// Creates the specified .NET type from the <see cref="JToken"/> using the specified <see cref="JsonSerializer"/>.
+        /// Creates an instance of the specified .NET type from the <see cref="JToken"/> using the specified <see cref="JsonSerializer"/>.
         /// </summary>
         /// <typeparam name="T">The object type that the token will be deserialized to.</typeparam>
         /// <param name="jsonSerializer">The <see cref="JsonSerializer"/> that will be used when creating the object.</param>
@@ -2059,7 +2058,7 @@ namespace Newtonsoft.Json.Linq
         }
 
         /// <summary>
-        /// Creates the specified .NET type from the <see cref="JToken"/> using the specified <see cref="JsonSerializer"/>.
+        /// Creates an instance of the specified .NET type from the <see cref="JToken"/> using the specified <see cref="JsonSerializer"/>.
         /// </summary>
         /// <param name="objectType">The object type that the token will be deserialized to.</param>
         /// <param name="jsonSerializer">The <see cref="JsonSerializer"/> that will be used when creating the object.</param>
@@ -2077,9 +2076,9 @@ namespace Newtonsoft.Json.Linq
         /// <summary>
         /// Creates a <see cref="JToken"/> from a <see cref="JsonReader"/>.
         /// </summary>
-        /// <param name="reader">An <see cref="JsonReader"/> positioned at the token to read into this <see cref="JToken"/>.</param>
+        /// <param name="reader">A <see cref="JsonReader"/> positioned at the token to read into this <see cref="JToken"/>.</param>
         /// <returns>
-        /// An <see cref="JToken"/> that contains the token and its descendant tokens
+        /// A <see cref="JToken"/> that contains the token and its descendant tokens
         /// that were read from the reader. The runtime type of the token is determined
         /// by the token type of the first token encountered in the reader.
         /// </returns>
@@ -2093,9 +2092,9 @@ namespace Newtonsoft.Json.Linq
         /// </summary>
         /// <param name="reader">An <see cref="JsonReader"/> positioned at the token to read into this <see cref="JToken"/>.</param>
         /// <param name="settings">The <see cref="JsonLoadSettings"/> used to load the JSON.
-        /// If this is null, default load settings will be used.</param>
+        /// If this is <c>null</c>, default load settings will be used.</param>
         /// <returns>
-        /// An <see cref="JToken"/> that contains the token and its descendant tokens
+        /// A <see cref="JToken"/> that contains the token and its descendant tokens
         /// that were read from the reader. The runtime type of the token is determined
         /// by the token type of the first token encountered in the reader.
         /// </returns>
@@ -2103,16 +2102,25 @@ namespace Newtonsoft.Json.Linq
         {
             ValidationUtils.ArgumentNotNull(reader, nameof(reader));
 
+            bool hasContent;
             if (reader.TokenType == JsonToken.None)
             {
-                bool hasContent = (settings != null && settings.CommentHandling == CommentHandling.Ignore)
+                hasContent = (settings != null && settings.CommentHandling == CommentHandling.Ignore)
                     ? reader.ReadAndMoveToContent()
                     : reader.Read();
+            }
+            else if (reader.TokenType == JsonToken.Comment && settings?.CommentHandling == CommentHandling.Ignore)
+            {
+                hasContent = reader.ReadAndMoveToContent();
+            }
+            else
+            {
+                hasContent = true;
+            }
 
-                if (!hasContent)
-                {
-                    throw JsonReaderException.Create(reader, "Error reading JToken from JsonReader.");
-                }
+            if (!hasContent)
+            {
+                throw JsonReaderException.Create(reader, "Error reading JToken from JsonReader.");
             }
 
             IJsonLineInfo lineInfo = reader as IJsonLineInfo;
@@ -2168,7 +2176,7 @@ namespace Newtonsoft.Json.Linq
         /// </summary>
         /// <param name="json">A <see cref="String"/> that contains JSON.</param>
         /// <param name="settings">The <see cref="JsonLoadSettings"/> used to load the JSON.
-        /// If this is null, default load settings will be used.</param>
+        /// If this is <c>null</c>, default load settings will be used.</param>
         /// <returns>A <see cref="JToken"/> populated from the string that contains JSON.</returns>
         public static JToken Parse(string json, JsonLoadSettings settings)
         {
@@ -2176,10 +2184,11 @@ namespace Newtonsoft.Json.Linq
             {
                 JToken t = Load(reader, settings);
 
-                if (reader.Read() && reader.TokenType != JsonToken.Comment)
+                while (reader.Read())
                 {
-                    throw JsonReaderException.Create(reader, "Additional text found in JSON string after parsing content.");
+                    // Any content encountered here other than a comment will throw in the reader.
                 }
+
 
                 return t;
             }
@@ -2188,11 +2197,11 @@ namespace Newtonsoft.Json.Linq
         /// <summary>
         /// Creates a <see cref="JToken"/> from a <see cref="JsonReader"/>.
         /// </summary>
-        /// <param name="reader">An <see cref="JsonReader"/> positioned at the token to read into this <see cref="JToken"/>.</param>
+        /// <param name="reader">A <see cref="JsonReader"/> positioned at the token to read into this <see cref="JToken"/>.</param>
         /// <param name="settings">The <see cref="JsonLoadSettings"/> used to load the JSON.
-        /// If this is null, default load settings will be used.</param>
+        /// If this is <c>null</c>, default load settings will be used.</param>
         /// <returns>
-        /// An <see cref="JToken"/> that contains the token and its descendant tokens
+        /// A <see cref="JToken"/> that contains the token and its descendant tokens
         /// that were read from the reader. The runtime type of the token is determined
         /// by the token type of the first token encountered in the reader.
         /// </returns>
@@ -2204,9 +2213,9 @@ namespace Newtonsoft.Json.Linq
         /// <summary>
         /// Creates a <see cref="JToken"/> from a <see cref="JsonReader"/>.
         /// </summary>
-        /// <param name="reader">An <see cref="JsonReader"/> positioned at the token to read into this <see cref="JToken"/>.</param>
+        /// <param name="reader">A <see cref="JsonReader"/> positioned at the token to read into this <see cref="JToken"/>.</param>
         /// <returns>
-        /// An <see cref="JToken"/> that contains the token and its descendant tokens
+        /// A <see cref="JToken"/> that contains the token and its descendant tokens
         /// that were read from the reader. The runtime type of the token is determined
         /// by the token type of the first token encountered in the reader.
         /// </returns>
@@ -2217,7 +2226,7 @@ namespace Newtonsoft.Json.Linq
 
         internal void SetLineInfo(IJsonLineInfo lineInfo, JsonLoadSettings settings)
         {
-            if (settings != null && settings.LineInfoHandling == LineInfoHandling.Load)
+            if (settings != null && settings.LineInfoHandling != LineInfoHandling.Load)
             {
                 return;
             }
@@ -2286,7 +2295,7 @@ namespace Newtonsoft.Json.Linq
         /// <param name="path">
         /// A <see cref="String"/> that contains a JPath expression.
         /// </param>
-        /// <returns>A <see cref="JToken"/>, or null.</returns>
+        /// <returns>A <see cref="JToken"/>, or <c>null</c>.</returns>
         public JToken SelectToken(string path)
         {
             return SelectToken(path, false);
@@ -2324,7 +2333,7 @@ namespace Newtonsoft.Json.Linq
         /// <param name="path">
         /// A <see cref="String"/> that contains a JPath expression.
         /// </param>
-        /// <returns>An <see cref="IEnumerable{JToken}"/> that contains the selected elements.</returns>
+        /// <returns>An <see cref="IEnumerable{T}"/> of <see cref="JToken"/> that contains the selected elements.</returns>
         public IEnumerable<JToken> SelectTokens(string path)
         {
             return SelectTokens(path, false);
@@ -2337,32 +2346,32 @@ namespace Newtonsoft.Json.Linq
         /// A <see cref="String"/> that contains a JPath expression.
         /// </param>
         /// <param name="errorWhenNoMatch">A flag to indicate whether an error should be thrown if no tokens are found when evaluating part of the expression.</param>
-        /// <returns>An <see cref="IEnumerable{JToken}"/> that contains the selected elements.</returns>
+        /// <returns>An <see cref="IEnumerable{T}"/> of <see cref="JToken"/> that contains the selected elements.</returns>
         public IEnumerable<JToken> SelectTokens(string path, bool errorWhenNoMatch)
         {
             JPath p = new JPath(path);
             return p.Evaluate(this, this, errorWhenNoMatch);
         }
 
-#if !(NET35 || NET20 || PORTABLE40)
+#if HAVE_DYNAMIC
         /// <summary>
-        /// Returns the <see cref="T:System.Dynamic.DynamicMetaObject"/> responsible for binding operations performed on this object.
+        /// Returns the <see cref="DynamicMetaObject"/> responsible for binding operations performed on this object.
         /// </summary>
         /// <param name="parameter">The expression tree representation of the runtime value.</param>
         /// <returns>
-        /// The <see cref="T:System.Dynamic.DynamicMetaObject"/> to bind this object.
+        /// The <see cref="DynamicMetaObject"/> to bind this object.
         /// </returns>
         protected virtual DynamicMetaObject GetMetaObject(Expression parameter)
         {
-            return new DynamicProxyMetaObject<JToken>(parameter, this, new DynamicProxy<JToken>(), true);
+            return new DynamicProxyMetaObject<JToken>(parameter, this, new DynamicProxy<JToken>());
         }
 
         /// <summary>
-        /// Returns the <see cref="T:System.Dynamic.DynamicMetaObject"/> responsible for binding operations performed on this object.
+        /// Returns the <see cref="DynamicMetaObject"/> responsible for binding operations performed on this object.
         /// </summary>
         /// <param name="parameter">The expression tree representation of the runtime value.</param>
         /// <returns>
-        /// The <see cref="T:System.Dynamic.DynamicMetaObject"/> to bind this object.
+        /// The <see cref="DynamicMetaObject"/> to bind this object.
         /// </returns>
         DynamicMetaObject IDynamicMetaObjectProvider.GetMetaObject(Expression parameter)
         {
@@ -2370,7 +2379,7 @@ namespace Newtonsoft.Json.Linq
         }
 #endif
 
-#if !(DOTNET || PORTABLE || PORTABLE40)
+#if HAVE_ICLONEABLE
         object ICloneable.Clone()
         {
             return DeepClone();
@@ -2403,8 +2412,7 @@ namespace Newtonsoft.Json.Linq
             }
             else
             {
-                object[] annotations = _annotations as object[];
-                if (annotations == null)
+                if (!(_annotations is object[] annotations))
                 {
                     _annotations = new[] { _annotations, annotation };
                 }
@@ -2434,8 +2442,7 @@ namespace Newtonsoft.Json.Linq
         {
             if (_annotations != null)
             {
-                object[] annotations = _annotations as object[];
-                if (annotations == null)
+                if (!(_annotations is object[] annotations))
                 {
                     return (_annotations as T);
                 }
@@ -2447,8 +2454,7 @@ namespace Newtonsoft.Json.Linq
                         break;
                     }
 
-                    T local = annotation as T;
-                    if (local != null)
+                    if (annotation is T local)
                     {
                         return local;
                     }
@@ -2472,8 +2478,7 @@ namespace Newtonsoft.Json.Linq
 
             if (_annotations != null)
             {
-                object[] annotations = _annotations as object[];
-                if (annotations == null)
+                if (!(_annotations is object[] annotations))
                 {
                     if (type.IsInstanceOfType(_annotations))
                     {
@@ -2505,7 +2510,7 @@ namespace Newtonsoft.Json.Linq
         /// Gets a collection of annotations of the specified type for this <see cref="JToken"/>.
         /// </summary>
         /// <typeparam name="T">The type of the annotations to retrieve.</typeparam>
-        /// <returns>An <see cref="IEnumerable{T}"/>  that contains the annotations for this <see cref="JToken"/>.</returns>
+        /// <returns>An <see cref="IEnumerable{T}"/> that contains the annotations for this <see cref="JToken"/>.</returns>
         public IEnumerable<T> Annotations<T>() where T : class
         {
             if (_annotations == null)
@@ -2513,8 +2518,7 @@ namespace Newtonsoft.Json.Linq
                 yield break;
             }
 
-            object[] annotations = _annotations as object[];
-            if (annotations != null)
+            if (_annotations is object[] annotations)
             {
                 for (int i = 0; i < annotations.Length; i++)
                 {
@@ -2524,8 +2528,7 @@ namespace Newtonsoft.Json.Linq
                         break;
                     }
 
-                    T casted = o as T;
-                    if (casted != null)
+                    if (o is T casted)
                     {
                         yield return casted;
                     }
@@ -2533,8 +2536,7 @@ namespace Newtonsoft.Json.Linq
                 yield break;
             }
 
-            T annotation = _annotations as T;
-            if (annotation == null)
+            if (!(_annotations is T annotation))
             {
                 yield break;
             }
@@ -2559,8 +2561,7 @@ namespace Newtonsoft.Json.Linq
                 yield break;
             }
 
-            object[] annotations = _annotations as object[];
-            if (annotations != null)
+            if (_annotations is object[] annotations)
             {
                 for (int i = 0; i < annotations.Length; i++)
                 {
@@ -2594,8 +2595,7 @@ namespace Newtonsoft.Json.Linq
         {
             if (_annotations != null)
             {
-                object[] annotations = _annotations as object[];
-                if (annotations == null)
+                if (!(_annotations is object[] annotations))
                 {
                     if (_annotations is T)
                     {
@@ -2650,8 +2650,7 @@ namespace Newtonsoft.Json.Linq
 
             if (_annotations != null)
             {
-                object[] annotations = _annotations as object[];
-                if (annotations == null)
+                if (!(_annotations is object[] annotations))
                 {
                     if (type.IsInstanceOfType(_annotations))
                     {

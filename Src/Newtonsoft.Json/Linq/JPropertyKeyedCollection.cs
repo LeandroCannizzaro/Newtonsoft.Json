@@ -72,10 +72,7 @@ namespace Newtonsoft.Json.Linq
         {
             base.ClearItems();
 
-            if (_dictionary != null)
-            {
-                _dictionary.Clear();
-            }
+            _dictionary?.Clear();
         }
 
         public bool Contains(string key)
@@ -101,8 +98,7 @@ namespace Newtonsoft.Json.Linq
             }
 
             string key = GetKeyForItem(item);
-            JToken value;
-            return _dictionary.TryGetValue(key, out value);
+            return _dictionary.TryGetValue(key, out _);
         }
 
         private void EnsureDictionary()
@@ -148,10 +144,7 @@ namespace Newtonsoft.Json.Linq
 
         private void RemoveKey(string key)
         {
-            if (_dictionary != null)
-            {
-                _dictionary.Remove(key);
-            }
+            _dictionary?.Remove(key);
         }
 
         protected override void SetItem(int index, JToken item)
@@ -264,8 +257,7 @@ namespace Newtonsoft.Json.Linq
 
             foreach (KeyValuePair<string, JToken> keyAndProperty in d1)
             {
-                JToken secondValue;
-                if (!d2.TryGetValue(keyAndProperty.Key, out secondValue))
+                if (!d2.TryGetValue(keyAndProperty.Key, out JToken secondValue))
                 {
                     return false;
                 }

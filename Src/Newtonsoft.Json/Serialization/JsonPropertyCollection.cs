@@ -104,6 +104,12 @@ namespace Newtonsoft.Json.Serialization
                             // current property is hidden by the existing so don't add it
                             return;
                         }
+                        
+                        if (_type.ImplementInterface(existingProperty.DeclaringType) && _type.ImplementInterface(property.DeclaringType))
+                        {
+                            // current property was already defined on another interface
+                            return;
+                        }
                     }
                 }
 
@@ -118,7 +124,7 @@ namespace Newtonsoft.Json.Serialization
 
         /// <summary>
         /// Gets the closest matching <see cref="JsonProperty"/> object.
-        /// First attempts to get an exact case match of propertyName and then
+        /// First attempts to get an exact case match of <paramref name="propertyName"/> and then
         /// a case insensitive match.
         /// </summary>
         /// <param name="propertyName">Name of the property.</param>
@@ -156,8 +162,7 @@ namespace Newtonsoft.Json.Serialization
             // KeyedCollection has an ordinal comparer
             if (comparisonType == StringComparison.Ordinal)
             {
-                JsonProperty property;
-                if (TryGetValue(propertyName, out property))
+                if (TryGetValue(propertyName, out JsonProperty property))
                 {
                     return property;
                 }

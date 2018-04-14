@@ -30,7 +30,7 @@ using Newtonsoft.Json.Utilities;
 namespace Newtonsoft.Json.Converters
 {
     /// <summary>
-    /// Converts a <see cref="DateTime"/> to and from a JavaScript date constructor (e.g. new Date(52231943)).
+    /// Converts a <see cref="DateTime"/> to and from a JavaScript <c>Date</c> constructor (e.g. <c>new Date(52231943)</c>).
     /// </summary>
     public class JavaScriptDateTimeConverter : DateTimeConverterBase
     {
@@ -44,16 +44,14 @@ namespace Newtonsoft.Json.Converters
         {
             long ticks;
 
-            if (value is DateTime)
+            if (value is DateTime dateTime)
             {
-                DateTime dateTime = (DateTime)value;
                 DateTime utcDateTime = dateTime.ToUniversalTime();
                 ticks = DateTimeUtils.ConvertDateTimeToJavaScriptTicks(utcDateTime);
             }
-#if !NET20
-            else if (value is DateTimeOffset)
+#if HAVE_DATE_TIME_OFFSET
+            else if (value is DateTimeOffset dateTimeOffset)
             {
-                DateTimeOffset dateTimeOffset = (DateTimeOffset)value;
                 DateTimeOffset utcDateTimeOffset = dateTimeOffset.ToUniversalTime();
                 ticks = DateTimeUtils.ConvertDateTimeToJavaScriptTicks(utcDateTimeOffset.UtcDateTime);
             }
@@ -111,7 +109,7 @@ namespace Newtonsoft.Json.Converters
                 throw JsonSerializationException.Create(reader, "Unexpected token parsing date. Expected EndConstructor, got {0}.".FormatWith(CultureInfo.InvariantCulture, reader.TokenType));
             }
 
-#if !NET20
+#if HAVE_DATE_TIME_OFFSET
             Type t = (ReflectionUtils.IsNullableType(objectType))
                 ? Nullable.GetUnderlyingType(objectType)
                 : objectType;
@@ -120,7 +118,6 @@ namespace Newtonsoft.Json.Converters
                 return new DateTimeOffset(d);
             }
 #endif
-
             return d;
         }
     }

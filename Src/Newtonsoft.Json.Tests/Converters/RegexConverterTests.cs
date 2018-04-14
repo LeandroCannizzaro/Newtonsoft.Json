@@ -51,6 +51,18 @@ namespace Newtonsoft.Json.Tests.Converters
         }
 
         [Test]
+        public void WriteJsonNull()
+        {
+            StringWriter sw = new StringWriter();
+            JsonTextWriter jsonWriter = new JsonTextWriter(sw);
+
+            RegexConverter converter = new RegexConverter();
+            converter.WriteJson(jsonWriter, null, null);
+
+            StringAssert.AreEqual(@"null", sw.ToString());
+        }
+
+        [Test]
         public void SerializeToText()
         {
             Regex regex = new Regex("abc", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
@@ -115,6 +127,68 @@ namespace Newtonsoft.Json.Tests.Converters
         }
 
         [Test]
+        public void DeserializeStringRegex()
+        {
+            string json = @"{
+  ""Regex"": ""\/abc\/""
+}";
+
+            RegexTestClass c = JsonConvert.DeserializeObject<RegexTestClass>(json, new JsonSerializerSettings
+            {
+                Converters = { new RegexConverter() }
+            });
+
+            Assert.AreEqual("abc", c.Regex.ToString());
+            Assert.AreEqual(RegexOptions.None, c.Regex.Options);
+        }
+
+        [Test]
+        public void DeserializeStringRegex_NoStartSlash_Error()
+        {
+            string json = @"{
+  ""Regex"": ""abc\/""
+}";
+
+            ExceptionAssert.Throws<JsonSerializationException>(
+                () => JsonConvert.DeserializeObject<RegexTestClass>(json, new JsonSerializerSettings
+                {
+                    Converters = { new RegexConverter() }
+                }),
+                "Regex pattern must be enclosed by slashes. Path 'Regex', line 2, position 18.");
+        }
+
+        [Test]
+        public void DeserializeStringRegex_NoEndSlash_Error()
+        {
+            string json = @"{
+  ""Regex"": ""\/abc""
+}";
+
+            ExceptionAssert.Throws<JsonSerializationException>(
+                () => JsonConvert.DeserializeObject<RegexTestClass>(json, new JsonSerializerSettings
+                {
+                    Converters = {new RegexConverter()}
+                }),
+                "Regex pattern must be enclosed by slashes. Path 'Regex', line 2, position 18.");
+        }
+
+        [Test]
+        public void DeserializeStringRegex_NoStartAndEndSlashes_Error()
+        {
+            string json = @"{
+  ""Regex"": ""\/abc""
+}";
+
+            ExceptionAssert.Throws<JsonSerializationException>(
+                () => JsonConvert.DeserializeObject<RegexTestClass>(json, new JsonSerializerSettings
+                {
+                    Converters = { new RegexConverter() }
+                }),
+                "Regex pattern must be enclosed by slashes. Path 'Regex', line 2, position 18.");
+        }
+
+#pragma warning disable 618
+        [Test]
         public void SerializeToBson()
         {
             Regex regex = new Regex("abc", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
@@ -130,19 +204,6 @@ namespace Newtonsoft.Json.Tests.Converters
             string bson = BytesToHex(ms.ToArray());
 
             Assert.AreEqual(expected, bson);
-        }
-
-        [Test]
-        public void DeserializeFromText()
-        {
-            string json = @"{
-  ""Pattern"": ""abc"",
-  ""Options"": 513
-}";
-
-            Regex newRegex = JsonConvert.DeserializeObject<Regex>(json, new RegexConverter());
-            Assert.AreEqual("abc", newRegex.ToString());
-            Assert.AreEqual(RegexOptions.IgnoreCase | RegexOptions.CultureInvariant, newRegex.Options);
         }
 
         [Test]
@@ -208,6 +269,20 @@ namespace Newtonsoft.Json.Tests.Converters
 
             Assert.AreEqual("/", c.Regex.ToString());
             Assert.AreEqual(RegexOptions.IgnoreCase | RegexOptions.Singleline | RegexOptions.Multiline | RegexOptions.ExplicitCapture, c.Regex.Options);
+        }
+#pragma warning restore 618
+
+        [Test]
+        public void DeserializeFromText()
+        {
+            string json = @"{
+  ""Pattern"": ""abc"",
+  ""Options"": 513
+}";
+
+            Regex newRegex = JsonConvert.DeserializeObject<Regex>(json, new RegexConverter());
+            Assert.AreEqual("abc", newRegex.ToString());
+            Assert.AreEqual(RegexOptions.IgnoreCase | RegexOptions.CultureInvariant, newRegex.Options);
         }
 
         [Test]

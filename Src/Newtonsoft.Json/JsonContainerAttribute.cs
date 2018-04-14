@@ -60,8 +60,8 @@ namespace Newtonsoft.Json
 
         /// <summary>
         /// The parameter list to use when constructing the <see cref="JsonConverter"/> described by <see cref="ItemConverterType"/>.
-        /// If null, the default constructor is used.
-        /// When non-null, there must be a constructor defined in the <see cref="JsonConverter"/> that exactly matches the number,
+        /// If <c>null</c>, the default constructor is used.
+        /// When non-<c>null</c>, there must be a constructor defined in the <see cref="JsonConverter"/> that exactly matches the number,
         /// order, and type of these parameters.
         /// </summary>
         /// <example>
@@ -77,7 +77,7 @@ namespace Newtonsoft.Json
         /// <value>The <see cref="Type"/> of the <see cref="NamingStrategy"/>.</value>
         public Type NamingStrategyType
         {
-            get { return _namingStrategyType; }
+            get => _namingStrategyType;
             set
             {
                 _namingStrategyType = value;
@@ -87,8 +87,8 @@ namespace Newtonsoft.Json
 
         /// <summary>
         /// The parameter list to use when constructing the <see cref="NamingStrategy"/> described by <see cref="NamingStrategyType"/>.
-        /// If null, the default constructor is used.
-        /// When non-null, there must be a constructor defined in the <see cref="NamingStrategy"/> that exactly matches the number,
+        /// If <c>null</c>, the default constructor is used.
+        /// When non-<c>null</c>, there must be a constructor defined in the <see cref="NamingStrategy"/> that exactly matches the number,
         /// order, and type of these parameters.
         /// </summary>
         /// <example>
@@ -98,7 +98,7 @@ namespace Newtonsoft.Json
         /// </example>
         public object[] NamingStrategyParameters
         {
-            get { return _namingStrategyParameters; }
+            get => _namingStrategyParameters;
             set
             {
                 _namingStrategyParameters = value;
@@ -125,8 +125,8 @@ namespace Newtonsoft.Json
         /// </value>
         public bool IsReference
         {
-            get { return _isReference ?? default(bool); }
-            set { _isReference = value; }
+            get => _isReference ?? default(bool);
+            set => _isReference = value;
         }
 
         /// <summary>
@@ -137,8 +137,8 @@ namespace Newtonsoft.Json
         /// </value>
         public bool ItemIsReference
         {
-            get { return _itemIsReference ?? default(bool); }
-            set { _itemIsReference = value; }
+            get => _itemIsReference ?? default(bool);
+            set => _itemIsReference = value;
         }
 
         /// <summary>
@@ -147,8 +147,8 @@ namespace Newtonsoft.Json
         /// <value>The reference loop handling.</value>
         public ReferenceLoopHandling ItemReferenceLoopHandling
         {
-            get { return _itemReferenceLoopHandling ?? default(ReferenceLoopHandling); }
-            set { _itemReferenceLoopHandling = value; }
+            get => _itemReferenceLoopHandling ?? default(ReferenceLoopHandling);
+            set => _itemReferenceLoopHandling = value;
         }
 
         /// <summary>
@@ -157,8 +157,8 @@ namespace Newtonsoft.Json
         /// <value>The type name handling.</value>
         public TypeNameHandling ItemTypeNameHandling
         {
-            get { return _itemTypeNameHandling ?? default(TypeNameHandling); }
-            set { _itemTypeNameHandling = value; }
+            get => _itemTypeNameHandling ?? default(TypeNameHandling);
+            set => _itemTypeNameHandling = value;
         }
 
         /// <summary>

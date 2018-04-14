@@ -28,7 +28,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Text;
 using System.Globalization;
-#if NET20
+#if !HAVE_LINQ
 using Newtonsoft.Json.Utilities.LinqBridge;
 #else
 using System.Linq;
@@ -75,7 +75,7 @@ namespace Newtonsoft.Json.Utilities
         }
 
         /// <summary>
-        /// Determines whether the string is all white space. Empty string will return false.
+        /// Determines whether the string is all white space. Empty string will return <c>false</c>.
         /// </summary>
         /// <param name="s">The string to test whether it is all white space.</param>
         /// <returns>
@@ -165,19 +165,36 @@ namespace Newtonsoft.Json.Utilities
                 bool hasNext = (i + 1 < chars.Length);
                 if (i > 0 && hasNext && !char.IsUpper(chars[i + 1]))
                 {
+                    // if the next character is a space, which is not considered uppercase 
+                    // (otherwise we wouldn't be here...)
+                    // we want to ensure that the following:
+                    // 'FOO bar' is rewritten as 'foo bar', and not as 'foO bar'
+                    // The code was written in such a way that the first word in uppercase
+                    // ends when if finds an uppercase letter followed by a lowercase letter.
+                    // now a ' ' (space, (char)32) is considered not upper
+                    // but in that case we still want our current character to become lowercase
+                    if (char.IsSeparator(chars[i + 1]))
+                    {
+                        chars[i] = ToLower(chars[i]);
+                    }
+
                     break;
                 }
 
-                char c;
-#if !(DOTNET || PORTABLE)
-                c = char.ToLower(chars[i], CultureInfo.InvariantCulture);
-#else
-                c = char.ToLowerInvariant(chars[i]);
-#endif
-                chars[i] = c;
+                chars[i] = ToLower(chars[i]);
             }
 
             return new string(chars);
+        }
+
+        private static char ToLower(char c)
+        {
+#if HAVE_CHAR_TO_STRING_WITH_CULTURE
+            c = char.ToLower(c, CultureInfo.InvariantCulture);
+#else
+            c = char.ToLowerInvariant(c);
+#endif
+            return c;
         }
 
         internal enum SnakeCaseState
@@ -229,7 +246,7 @@ namespace Newtonsoft.Json.Utilities
                     }
 
                     char c;
-#if !(DOTNET || PORTABLE)
+#if HAVE_CHAR_TO_LOWER_WITH_CULTURE
                     c = char.ToLower(s[i], CultureInfo.InvariantCulture);
 #else
                     c = char.ToLowerInvariant(s[i]);
@@ -260,7 +277,7 @@ namespace Newtonsoft.Json.Utilities
 
         public static bool IsHighSurrogate(char c)
         {
-#if !(PORTABLE40 || PORTABLE)
+#if HAVE_UNICODE_SURROGATE_DETECTION
             return char.IsHighSurrogate(c);
 #else
             return (c >= 55296 && c <= 56319);
@@ -269,7 +286,7 @@ namespace Newtonsoft.Json.Utilities
 
         public static bool IsLowSurrogate(char c)
         {
-#if !(PORTABLE40 || PORTABLE)
+#if HAVE_UNICODE_SURROGATE_DETECTION
             return char.IsLowSurrogate(c);
 #else
             return (c >= 56320 && c <= 57343);
@@ -284,6 +301,44 @@ namespace Newtonsoft.Json.Utilities
         public static bool EndsWith(this string source, char value)
         {
             return (source.Length > 0 && source[source.Length - 1] == value);
+        }
+
+        public static string Trim(this string s, int start, int length)
+        {
+            // References: https://referencesource.microsoft.com/#mscorlib/system/string.cs,2691
+            // https://referencesource.microsoft.com/#mscorlib/system/string.cs,1226
+            if (s == null)
+            {
+                throw new ArgumentNullException();
+            }
+            if (start < 0)
+            {
+                throw new ArgumentOutOfRangeException(nameof(start));
+            }
+            if (length < 0)
+            {
+                throw new ArgumentOutOfRangeException(nameof(length));
+            }
+            int end = start + length - 1;
+            if (end >= s.Length)
+            {
+                throw new ArgumentOutOfRangeException(nameof(length));
+            }
+            for (; start < end; start++)
+            {
+                if (!char.IsWhiteSpace(s[start]))
+                {
+                    break;
+                }
+            }
+            for (; end >= start; end--)
+            {
+                if (!char.IsWhiteSpace(s[end]))
+                {
+                    break;
+                }
+            }
+            return s.Substring(start, end - start + 1);
         }
     }
 }
