@@ -35,7 +35,7 @@ namespace Newtonsoft.Json.Linq
     /// <summary>
     /// Represents a JSON property.
     /// </summary>
-    public class JProperty : JContainer
+    public partial class JProperty : JContainer
     {
         #region JPropertyList
         private class JPropertyList : IList<JToken>
@@ -88,15 +88,9 @@ namespace Newtonsoft.Json.Linq
                 return false;
             }
 
-            public int Count
-            {
-                get { return (_token != null) ? 1 : 0; }
-            }
+            public int Count => (_token != null) ? 1 : 0;
 
-            public bool IsReadOnly
-            {
-                get { return false; }
-            }
+            public bool IsReadOnly => false;
 
             public int IndexOf(JToken item)
             {
@@ -121,7 +115,7 @@ namespace Newtonsoft.Json.Linq
 
             public JToken this[int index]
             {
-                get { return (index == 0) ? _token : null; }
+                get => (index == 0) ? _token : null;
                 set
                 {
                     if (index == 0)
@@ -140,10 +134,7 @@ namespace Newtonsoft.Json.Linq
         /// Gets the container's children tokens.
         /// </summary>
         /// <value>The container's children tokens.</value>
-        protected override IList<JToken> ChildrenTokens
-        {
-            get { return _content; }
-        }
+        protected override IList<JToken> ChildrenTokens => _content;
 
         /// <summary>
         /// Gets the property name.
@@ -212,17 +203,11 @@ namespace Newtonsoft.Json.Linq
                 return;
             }
 
-            if (Parent != null)
-            {
-                ((JObject)Parent).InternalPropertyChanging(this);
-            }
+            ((JObject)Parent)?.InternalPropertyChanging(this);
 
             base.SetItem(0, item);
 
-            if (Parent != null)
-            {
-                ((JObject)Parent).InternalPropertyChanged(this);
-            }
+            ((JObject)Parent)?.InternalPropertyChanged(this);
         }
 
         internal override bool RemoveItem(JToken item)
@@ -263,15 +248,11 @@ namespace Newtonsoft.Json.Linq
 
         internal override void MergeItem(object content, JsonMergeSettings settings)
         {
-            JProperty p = content as JProperty;
-            if (p == null)
-            {
-                return;
-            }
+            JToken value = (content as JProperty)?.Value;
 
-            if (p.Value != null && p.Value.Type != JTokenType.Null)
+            if (value != null && value.Type != JTokenType.Null)
             {
-                Value = p.Value;
+                Value = value;
             }
         }
 
@@ -282,8 +263,7 @@ namespace Newtonsoft.Json.Linq
 
         internal override bool DeepEquals(JToken node)
         {
-            JProperty t = node as JProperty;
-            return (t != null && _name == t.Name && ContentsEqual(t));
+            return (node is JProperty t && _name == t.Name && ContentsEqual(t));
         }
 
         internal override JToken CloneToken()
@@ -357,11 +337,11 @@ namespace Newtonsoft.Json.Linq
 
         internal override int GetDeepHashCode()
         {
-            return _name.GetHashCode() ^ ((Value != null) ? Value.GetDeepHashCode() : 0);
+            return _name.GetHashCode() ^ (Value?.GetDeepHashCode() ?? 0);
         }
 
         /// <summary>
-        /// Loads an <see cref="JProperty"/> from a <see cref="JsonReader"/>. 
+        /// Loads a <see cref="JProperty"/> from a <see cref="JsonReader"/>.
         /// </summary>
         /// <param name="reader">A <see cref="JsonReader"/> that will be read for the content of the <see cref="JProperty"/>.</param>
         /// <returns>A <see cref="JProperty"/> that contains the JSON that was read from the specified <see cref="JsonReader"/>.</returns>
@@ -371,11 +351,11 @@ namespace Newtonsoft.Json.Linq
         }
 
         /// <summary>
-        /// Loads an <see cref="JProperty"/> from a <see cref="JsonReader"/>. 
+        /// Loads a <see cref="JProperty"/> from a <see cref="JsonReader"/>.
         /// </summary>
         /// <param name="reader">A <see cref="JsonReader"/> that will be read for the content of the <see cref="JProperty"/>.</param>
         /// <param name="settings">The <see cref="JsonLoadSettings"/> used to load the JSON.
-        /// If this is null, default load settings will be used.</param>
+        /// If this is <c>null</c>, default load settings will be used.</param>
         /// <returns>A <see cref="JProperty"/> that contains the JSON that was read from the specified <see cref="JsonReader"/>.</returns>
         public new static JProperty Load(JsonReader reader, JsonLoadSettings settings)
         {

@@ -33,6 +33,7 @@ namespace Newtonsoft.Json.Converters
     /// <summary>
     /// Converts a <see cref="BsonObjectId"/> to and from JSON and BSON.
     /// </summary>
+    [Obsolete("BSON reading and writing has been moved to its own package. See https://www.nuget.org/packages/Newtonsoft.Json.Bson for more details.")]
     public class BsonObjectIdConverter : JsonConverter
     {
         /// <summary>
@@ -45,8 +46,7 @@ namespace Newtonsoft.Json.Converters
         {
             BsonObjectId objectId = (BsonObjectId)value;
 
-            BsonWriter bsonWriter = writer as BsonWriter;
-            if (bsonWriter != null)
+            if (writer is BsonWriter bsonWriter)
             {
                 bsonWriter.WriteObjectId(objectId.Value);
             }

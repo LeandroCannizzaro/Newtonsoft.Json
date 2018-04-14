@@ -23,7 +23,8 @@
 // OTHER DEALINGS IN THE SOFTWARE.
 #endregion
 
-#if !(DOTNET || PORTABLE40 || PORTABLE)
+#if HAVE_ADO_NET
+using System.Collections;
 using System.Collections.Generic;
 using System.Globalization;
 using Newtonsoft.Json.Utilities;
@@ -46,6 +47,12 @@ namespace Newtonsoft.Json.Converters
         /// <param name="serializer">The calling serializer.</param>
         public override void WriteJson(JsonWriter writer, object value, JsonSerializer serializer)
         {
+            if (value == null)
+            {
+                writer.WriteNull();
+                return;
+            }
+
             DataTable table = (DataTable)value;
             DefaultContractResolver resolver = serializer.ContractResolver as DefaultContractResolver;
 
@@ -87,9 +94,7 @@ namespace Newtonsoft.Json.Converters
                 return null;
             }
 
-            DataTable dt = existingValue as DataTable;
-
-            if (dt == null)
+            if (!(existingValue is DataTable dt))
             {
                 // handle typed datasets
                 dt = (objectType == typeof(DataTable))
@@ -181,7 +186,7 @@ namespace Newtonsoft.Json.Converters
                     }
 
                     Array destinationArray = Array.CreateInstance(column.DataType.GetElementType(), o.Count);
-                    Array.Copy(o.ToArray(), destinationArray, o.Count);
+                    ((IList)o).CopyTo(destinationArray, 0);
 
                     dr[columnName] = destinationArray;
                 }

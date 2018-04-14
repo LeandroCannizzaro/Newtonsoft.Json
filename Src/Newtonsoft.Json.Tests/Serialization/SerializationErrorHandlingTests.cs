@@ -25,6 +25,7 @@
 
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Runtime.Serialization;
 using System.Text;
 using Newtonsoft.Json.Converters;
@@ -51,6 +52,80 @@ namespace Newtonsoft.Json.Tests.Serialization
     [TestFixture]
     public class SerializationErrorHandlingTests : TestFixtureBase
     {
+        [Test]
+        public void ErrorHandlingMetadata()
+        {
+            List<Exception> errors = new List<Exception>();
+
+            AAA a2 = JsonConvert.DeserializeObject<AAA>(@"{""MyTest"":{""$type"":""<Namespace>.JsonTest+MyTest2, <Assembly>""}}", new JsonSerializerSettings
+            {
+                TypeNameHandling = TypeNameHandling.Auto,
+                Error = (object sender, Json.Serialization.ErrorEventArgs e) =>
+                {
+                    errors.Add(e.ErrorContext.Error);
+                    e.ErrorContext.Handled = true;
+                }
+            });
+
+            Assert.IsNotNull(a2);
+            Assert.AreEqual(1, errors.Count);
+            Assert.AreEqual("Error resolving type specified in JSON '<Namespace>.JsonTest+MyTest2, <Assembly>'. Path 'MyTest.$type', line 1, position 61.", errors[0].Message);
+        }
+
+        [Test]
+        public void ErrorHandlingMetadata_TopLevel()
+        {
+            List<Exception> errors = new List<Exception>();
+
+            JObject a2 = (JObject)JsonConvert.DeserializeObject(@"{""$type"":""<Namespace>.JsonTest+MyTest2, <Assembly>""}", new JsonSerializerSettings
+            {
+                TypeNameHandling = TypeNameHandling.Auto,
+                Error = (object sender, Json.Serialization.ErrorEventArgs e) =>
+                {
+                    errors.Add(e.ErrorContext.Error);
+                    e.ErrorContext.Handled = true;
+                }
+            });
+
+            Assert.IsNull(a2);
+            Assert.AreEqual(1, errors.Count);
+            Assert.AreEqual("Error resolving type specified in JSON '<Namespace>.JsonTest+MyTest2, <Assembly>'. Path '$type', line 1, position 51.", errors[0].Message);
+        }
+
+        public class AAA
+        {
+            public ITest MyTest { get; set; }
+        }
+
+        public interface ITest { }
+        public class MyTest : ITest { }
+
+        public class MyClass1
+        {
+            [JsonProperty("myint")]
+            public int MyInt { get; set; }
+            [JsonProperty("Mybool")]
+            public bool Mybool { get; set; }
+        }
+
+        [Test]
+        public void ErrorDeserializingIntegerInObject()
+        {
+            var errors = new List<string>();
+            var json = "{\"myint\":3554860000,\"Mybool\":false}";
+            var i = JsonConvert.DeserializeObject<MyClass1>(json, new JsonSerializerSettings
+            {
+                Error = delegate (object sender, Newtonsoft.Json.Serialization.ErrorEventArgs args)
+                {
+                    errors.Add(args.ErrorContext.Error.Message);
+                    args.ErrorContext.Handled = true;
+                }
+            });
+
+            Assert.AreEqual(1, errors.Count);
+            Assert.AreEqual("JSON integer 3554860000 is too large or small for an Int32. Path 'myint', line 1, position 19.", errors[0]);
+        }
+
         [Test]
         public void ErrorDeserializingListHandled()
         {
@@ -951,6 +1026,21 @@ namespace Newtonsoft.Json.Tests.Serialization
             Assert.AreEqual("Could not convert string to DateTime: 200NOTDATE. Path 'dateTime1', line 7, position 27.", errorMessages[2]);
         }
 
+        [Test]
+        public void HandleErrorInDictionaryObject()
+        {
+            var json = @"{
+                model1: { String1: 's1', Int1: 'x' },
+                model2: { String1: 's2', Int1: 2 }
+            }";
+            var dictionary = JsonConvert.DeserializeObject<TolerantDictionary<string, DataModel>>(json);
+
+            Assert.AreEqual(1, dictionary.Count);
+            Assert.IsTrue(dictionary.ContainsKey("model2"));
+            Assert.AreEqual("s2", dictionary["model2"].String1);
+            Assert.AreEqual(2, dictionary["model2"].Int1);
+        }
+
         private class DataModel
         {
             public string String1 { get; set; }
@@ -1056,6 +1146,18 @@ namespace Newtonsoft.Json.Tests.Serialization
         [OnError]
         internal void OnError(StreamingContext context, ErrorContext errorContext)
         {
+        }
+    }
+    
+    /// <summary>
+    /// A dictionary that ignores deserialization errors and excludes bad items
+    /// </summary>
+    public class TolerantDictionary<TKey, TValue> : Dictionary<TKey, TValue>
+    {
+        [OnError]
+        public void OnDeserializationError(StreamingContext streamingContext, ErrorContext errorContext)
+        {
+            errorContext.Handled = true;
         }
     }
 }

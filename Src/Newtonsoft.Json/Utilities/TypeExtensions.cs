@@ -26,7 +26,7 @@
 using System;
 using System.Collections.Generic;
 using System.Reflection;
-#if NET20
+#if !HAVE_LINQ
 using Newtonsoft.Json.Utilities.LinqBridge;
 #else
 using System.Linq;
@@ -98,7 +98,7 @@ namespace Newtonsoft.Json.Utilities
 
         public static MethodInfo Method(this Delegate d)
         {
-#if !(DOTNET || PORTABLE)
+#if HAVE_FULL_REFLECTION
             return d.Method;
 #else
             return d.GetMethodInfo();
@@ -128,14 +128,14 @@ namespace Newtonsoft.Json.Utilities
             }
             else
             {
-                return MemberTypes.Other;
+                return default(MemberTypes);
             }
 #endif
         }
 
         public static bool ContainsGenericParameters(this Type type)
         {
-#if !(DOTNET || PORTABLE)
+#if HAVE_FULL_REFLECTION
             return type.ContainsGenericParameters;
 #else
             return type.GetTypeInfo().ContainsGenericParameters;
@@ -144,7 +144,7 @@ namespace Newtonsoft.Json.Utilities
 
         public static bool IsInterface(this Type type)
         {
-#if !(DOTNET || PORTABLE)
+#if HAVE_FULL_REFLECTION
             return type.IsInterface;
 #else
             return type.GetTypeInfo().IsInterface;
@@ -153,7 +153,7 @@ namespace Newtonsoft.Json.Utilities
 
         public static bool IsGenericType(this Type type)
         {
-#if !(DOTNET || PORTABLE)
+#if HAVE_FULL_REFLECTION
             return type.IsGenericType;
 #else
             return type.GetTypeInfo().IsGenericType;
@@ -162,7 +162,7 @@ namespace Newtonsoft.Json.Utilities
 
         public static bool IsGenericTypeDefinition(this Type type)
         {
-#if !(DOTNET || PORTABLE)
+#if HAVE_FULL_REFLECTION
             return type.IsGenericTypeDefinition;
 #else
             return type.GetTypeInfo().IsGenericTypeDefinition;
@@ -171,7 +171,7 @@ namespace Newtonsoft.Json.Utilities
 
         public static Type BaseType(this Type type)
         {
-#if !(DOTNET || PORTABLE)
+#if HAVE_FULL_REFLECTION
             return type.BaseType;
 #else
             return type.GetTypeInfo().BaseType;
@@ -180,7 +180,7 @@ namespace Newtonsoft.Json.Utilities
 
         public static Assembly Assembly(this Type type)
         {
-#if !(DOTNET || PORTABLE)
+#if HAVE_FULL_REFLECTION
             return type.Assembly;
 #else
             return type.GetTypeInfo().Assembly;
@@ -189,7 +189,7 @@ namespace Newtonsoft.Json.Utilities
 
         public static bool IsEnum(this Type type)
         {
-#if !(DOTNET || PORTABLE)
+#if HAVE_FULL_REFLECTION
             return type.IsEnum;
 #else
             return type.GetTypeInfo().IsEnum;
@@ -198,7 +198,7 @@ namespace Newtonsoft.Json.Utilities
 
         public static bool IsClass(this Type type)
         {
-#if !(DOTNET || PORTABLE)
+#if HAVE_FULL_REFLECTION
             return type.IsClass;
 #else
             return type.GetTypeInfo().IsClass;
@@ -207,7 +207,7 @@ namespace Newtonsoft.Json.Utilities
 
         public static bool IsSealed(this Type type)
         {
-#if !(DOTNET || PORTABLE)
+#if HAVE_FULL_REFLECTION
             return type.IsSealed;
 #else
             return type.GetTypeInfo().IsSealed;
@@ -248,7 +248,7 @@ namespace Newtonsoft.Json.Utilities
 #else
             return type.GetMember(name, bindingFlags).Where(m =>
             {
-                if (m.MemberType() != memberType)
+                if ((m.MemberType() | memberType) != memberType)
                 {
                     return false;
                 }
@@ -334,18 +334,24 @@ namespace Newtonsoft.Json.Utilities
             return type.GetTypeInfo().GetMembersRecursive().Where(m =>
                 m.Name == member &&
                 // test type before accessibility - accessibility doesn't support some types
-                (memberType == null || m.MemberType() == memberType) &&
+                (memberType == null || (m.MemberType() | memberType) == memberType) &&
                 TestAccessibility(m, bindingFlags)).ToArray();
         }
 
-        public static MemberInfo GetField(this Type type, string member)
+        public static FieldInfo GetField(this Type type, string member)
         {
             return type.GetField(member, DefaultFlags);
         }
 
-        public static MemberInfo GetField(this Type type, string member, BindingFlags bindingFlags)
+        public static FieldInfo GetField(this Type type, string member, BindingFlags bindingFlags)
         {
-            return type.GetTypeInfo().GetDeclaredField(member);
+            FieldInfo field = type.GetTypeInfo().GetDeclaredField(member);
+            if (field == null || !TestAccessibility(field, bindingFlags))
+            {
+                return null;
+            }
+            
+            return field;
         }
 
         public static IEnumerable<PropertyInfo> GetProperties(this Type type, BindingFlags bindingFlags)
@@ -357,20 +363,33 @@ namespace Newtonsoft.Json.Utilities
             return properties.Where(p => TestAccessibility(p, bindingFlags));
         }
 
+        private static bool ContainsMemberName(IEnumerable<MemberInfo> members, string name)
+        {
+            foreach (MemberInfo memberInfo in members)
+            {
+                if (memberInfo.Name == name)
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
         private static IList<MemberInfo> GetMembersRecursive(this TypeInfo type)
         {
             TypeInfo t = type;
-            IList<MemberInfo> members = new List<MemberInfo>();
+            List<MemberInfo> members = new List<MemberInfo>();
             while (t != null)
             {
                 foreach (MemberInfo member in t.DeclaredMembers)
                 {
-                    if (!members.Any(p => p.Name == member.Name))
+                    if (!ContainsMemberName(members, member.Name))
                     {
                         members.Add(member);
                     }
                 }
-                t = (t.BaseType != null) ? t.BaseType.GetTypeInfo() : null;
+                t = t.BaseType?.GetTypeInfo();
             }
 
             return members;
@@ -379,17 +398,17 @@ namespace Newtonsoft.Json.Utilities
         private static IList<PropertyInfo> GetPropertiesRecursive(this TypeInfo type)
         {
             TypeInfo t = type;
-            IList<PropertyInfo> properties = new List<PropertyInfo>();
+            List<PropertyInfo> properties = new List<PropertyInfo>();
             while (t != null)
             {
                 foreach (PropertyInfo member in t.DeclaredProperties)
                 {
-                    if (!properties.Any(p => p.Name == member.Name))
+                    if (!ContainsMemberName(properties, member.Name))
                     {
                         properties.Add(member);
                     }
                 }
-                t = (t.BaseType != null) ? t.BaseType.GetTypeInfo() : null;
+                t = t.BaseType?.GetTypeInfo();
             }
 
             return properties;
@@ -398,17 +417,17 @@ namespace Newtonsoft.Json.Utilities
         private static IList<FieldInfo> GetFieldsRecursive(this TypeInfo type)
         {
             TypeInfo t = type;
-            IList<FieldInfo> fields = new List<FieldInfo>();
+            List<FieldInfo> fields = new List<FieldInfo>();
             while (t != null)
             {
                 foreach (FieldInfo member in t.DeclaredFields)
                 {
-                    if (!fields.Any(p => p.Name == member.Name))
+                    if (!ContainsMemberName(fields, member.Name))
                     {
                         fields.Add(member);
                     }
                 }
-                t = (t.BaseType != null) ? t.BaseType.GetTypeInfo() : null;
+                t = t.BaseType?.GetTypeInfo();
             }
 
             return fields;
@@ -426,7 +445,13 @@ namespace Newtonsoft.Json.Utilities
 
         public static PropertyInfo GetProperty(this Type type, string name, BindingFlags bindingFlags)
         {
-            return type.GetTypeInfo().GetDeclaredProperty(name);
+            PropertyInfo property = type.GetTypeInfo().GetDeclaredProperty(name);
+            if (property == null || !TestAccessibility(property, bindingFlags))
+            {
+                return null;
+            }
+            
+            return property;
         }
 
         public static IEnumerable<FieldInfo> GetFields(this Type type)
@@ -517,7 +542,7 @@ namespace Newtonsoft.Json.Utilities
 
         public static bool IsAbstract(this Type type)
         {
-#if !(DOTNET || PORTABLE)
+#if HAVE_FULL_REFLECTION
             return type.IsAbstract;
 #else
             return type.GetTypeInfo().IsAbstract;
@@ -526,7 +551,7 @@ namespace Newtonsoft.Json.Utilities
 
         public static bool IsVisible(this Type type)
         {
-#if !(DOTNET || PORTABLE)
+#if HAVE_FULL_REFLECTION
             return type.IsVisible;
 #else
             return type.GetTypeInfo().IsVisible;
@@ -535,7 +560,7 @@ namespace Newtonsoft.Json.Utilities
 
         public static bool IsValueType(this Type type)
         {
-#if !(DOTNET || PORTABLE)
+#if HAVE_FULL_REFLECTION
             return type.IsValueType;
 #else
             return type.GetTypeInfo().IsValueType;
@@ -544,14 +569,14 @@ namespace Newtonsoft.Json.Utilities
         
         public static bool IsPrimitive(this Type type)
         {
-#if !(DOTNET || PORTABLE)
+#if HAVE_FULL_REFLECTION
             return type.IsPrimitive;
 #else
             return type.GetTypeInfo().IsPrimitive;
 #endif
         }
 
-        public static bool AssignableToTypeName(this Type type, string fullTypeName, out Type match)
+        public static bool AssignableToTypeName(this Type type, string fullTypeName, bool searchInterfaces, out Type match)
         {
             Type current = type;
 
@@ -566,12 +591,15 @@ namespace Newtonsoft.Json.Utilities
                 current = current.BaseType();
             }
 
-            foreach (Type i in type.GetInterfaces())
+            if (searchInterfaces)
             {
-                if (string.Equals(i.Name, fullTypeName, StringComparison.Ordinal))
+                foreach (Type i in type.GetInterfaces())
                 {
-                    match = type;
-                    return true;
+                    if (string.Equals(i.Name, fullTypeName, StringComparison.Ordinal))
+                    {
+                        match = type;
+                        return true;
+                    }
                 }
             }
 
@@ -579,10 +607,10 @@ namespace Newtonsoft.Json.Utilities
             return false;
         }
 
-        public static bool AssignableToTypeName(this Type type, string fullTypeName)
+        public static bool AssignableToTypeName(this Type type, string fullTypeName, bool searchInterfaces)
         {
             Type match;
-            return type.AssignableToTypeName(fullTypeName, out match);
+            return type.AssignableToTypeName(fullTypeName, searchInterfaces, out match);
         }
 
         public static bool ImplementInterface(this Type type, Type interfaceType)
