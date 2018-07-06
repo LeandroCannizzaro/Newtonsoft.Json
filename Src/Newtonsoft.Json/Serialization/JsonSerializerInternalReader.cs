@@ -2201,7 +2201,7 @@ namespace Newtonsoft.Json.Serialization
 
             return propertyValues;
         }
-
+		
         public object CreateNewObject(JsonReader reader, JsonObjectContract objectContract, JsonProperty containerMember, JsonProperty containerProperty, string id, out bool createdFromNonDefaultCreator)
         {
             object newObject = null;
@@ -2214,7 +2214,8 @@ namespace Newtonsoft.Json.Serialization
                     return CreateObjectUsingCreatorWithParameters(reader, objectContract, containerMember, objectContract.OverrideCreator, id);
                 }
 
-                newObject = objectContract.OverrideCreator(CollectionUtils.ArrayEmpty<object>());
+	            newObject = objectContract.OverrideCreator(new object[]{containerProperty});
+                //newObject = objectContract.OverrideCreator(CollectionUtils.ArrayEmpty<object>());
             }
             else if (objectContract.DefaultCreator != null &&
                      (!objectContract.DefaultCreatorNonPublic || Serializer._constructorHandling == ConstructorHandling.AllowNonPublicDefaultConstructor || objectContract.ParameterizedCreator == null))

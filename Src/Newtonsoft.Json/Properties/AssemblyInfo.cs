@@ -29,7 +29,7 @@ using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Security;
 
-[assembly: AssemblyKeyFileAttribute(@"c:\doG\Projects\doGApplications\doG\doG.snk")]
+[assembly: AssemblyKeyFile(@"c:\doG\Projects\doGApplications\doG\doG.snk")]
 
 
 // General Information about an assembly is controlled through the following 
