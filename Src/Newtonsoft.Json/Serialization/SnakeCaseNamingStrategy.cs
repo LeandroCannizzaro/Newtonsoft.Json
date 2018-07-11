@@ -23,9 +23,9 @@
 // OTHER DEALINGS IN THE SOFTWARE.
 #endregion
 
-using Newtonsoft.Json.Utilities;
+using doG.Newtonsoft.Json.Utilities;
 
-namespace Newtonsoft.Json.Serialization
+namespace doG.Newtonsoft.Json.Serialization
 {
     /// <summary>
     /// A snake case naming strategy.

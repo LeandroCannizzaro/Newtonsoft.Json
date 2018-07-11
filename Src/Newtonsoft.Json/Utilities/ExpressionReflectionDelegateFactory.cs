@@ -31,9 +31,9 @@ using System.Text;
 using System;
 using System.Linq.Expressions;
 using System.Reflection;
-using Newtonsoft.Json.Serialization;
+using doG.Newtonsoft.Json.Serialization;
 
-namespace Newtonsoft.Json.Utilities
+namespace doG.Newtonsoft.Json.Utilities
 {
     internal class ExpressionReflectionDelegateFactory : ReflectionDelegateFactory
     {

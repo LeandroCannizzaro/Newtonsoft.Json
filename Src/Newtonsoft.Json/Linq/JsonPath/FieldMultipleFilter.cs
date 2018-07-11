@@ -1,13 +1,13 @@
 using System.Collections.Generic;
 using System.Globalization;
 #if !HAVE_LINQ
-using Newtonsoft.Json.Utilities.LinqBridge;
+using doG.Newtonsoft.Json.Utilities.LinqBridge;
 #else
 using System.Linq;
 #endif
-using Newtonsoft.Json.Utilities;
+using doG.Newtonsoft.Json.Utilities;
 
-namespace Newtonsoft.Json.Linq.JsonPath
+namespace doG.Newtonsoft.Json.Linq.JsonPath
 {
     internal class FieldMultipleFilter : PathFilter
     {

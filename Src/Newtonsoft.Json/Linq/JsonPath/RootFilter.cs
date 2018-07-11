@@ -1,6 +1,6 @@
 using System.Collections.Generic;
 
-namespace Newtonsoft.Json.Linq.JsonPath
+namespace doG.Newtonsoft.Json.Linq.JsonPath
 {
     internal class RootFilter : PathFilter
     {

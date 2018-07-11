@@ -35,15 +35,15 @@ using System.Dynamic;
 using System.Linq.Expressions;
 #endif
 using System.IO;
-using Newtonsoft.Json.Utilities;
+using doG.Newtonsoft.Json.Utilities;
 using System.Globalization;
 #if !HAVE_LINQ
-using Newtonsoft.Json.Utilities.LinqBridge;
+using doG.Newtonsoft.Json.Utilities.LinqBridge;
 #else
 using System.Linq;
 #endif
 
-namespace Newtonsoft.Json.Linq
+namespace doG.Newtonsoft.Json.Linq
 {
     /// <summary>
     /// Represents a JSON object.

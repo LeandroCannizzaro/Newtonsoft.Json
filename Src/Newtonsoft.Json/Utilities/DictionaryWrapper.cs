@@ -28,13 +28,13 @@ using System.Collections.Generic;
 using System.Collections;
 using System.Threading;
 #if !HAVE_LINQ
-using Newtonsoft.Json.Utilities.LinqBridge;
+using doG.Newtonsoft.Json.Utilities.LinqBridge;
 #else
 using System.Linq;
 
 #endif
 
-namespace Newtonsoft.Json.Utilities
+namespace doG.Newtonsoft.Json.Utilities
 {
     internal interface IWrappedDictionary
         : IDictionary

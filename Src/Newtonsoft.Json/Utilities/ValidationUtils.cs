@@ -25,7 +25,7 @@
 
 using System;
 
-namespace Newtonsoft.Json.Utilities
+namespace doG.Newtonsoft.Json.Utilities
 {
     internal static class ValidationUtils
     {

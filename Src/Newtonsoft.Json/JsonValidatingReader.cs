@@ -28,20 +28,20 @@ using System.Collections.Generic;
 #if HAVE_BIG_INTEGER
 using System.Numerics;
 #endif
-using Newtonsoft.Json.Linq;
-using Newtonsoft.Json.Schema;
-using Newtonsoft.Json.Utilities;
+using doG.Newtonsoft.Json.Linq;
+using doG.Newtonsoft.Json.Schema;
+using doG.Newtonsoft.Json.Utilities;
 using System.Globalization;
 using System.Text.RegularExpressions;
 using System.IO;
 #if !HAVE_LINQ
-using Newtonsoft.Json.Utilities.LinqBridge;
+using doG.Newtonsoft.Json.Utilities.LinqBridge;
 #else
 using System.Linq;
 
 #endif
 
-namespace Newtonsoft.Json
+namespace doG.Newtonsoft.Json
 {
     /// <summary>
     /// <para>

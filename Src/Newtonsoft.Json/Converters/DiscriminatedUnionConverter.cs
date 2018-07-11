@@ -24,21 +24,21 @@
 #endregion
 
 #if HAVE_FSHARP_TYPES
-using Newtonsoft.Json.Linq;
+using doG.Newtonsoft.Json.Linq;
 using System;
 using System.Collections;
 using System.Collections.Generic;
 #if !HAVE_LINQ
-using Newtonsoft.Json.Utilities.LinqBridge;
+using doG.Newtonsoft.Json.Utilities.LinqBridge;
 #else
 using System.Linq;
 #endif
 using System.Reflection;
-using Newtonsoft.Json.Serialization;
+using doG.Newtonsoft.Json.Serialization;
 using System.Globalization;
-using Newtonsoft.Json.Utilities;
+using doG.Newtonsoft.Json.Utilities;
 
-namespace Newtonsoft.Json.Converters
+namespace doG.Newtonsoft.Json.Converters
 {
     /// <summary>
     /// Converts a F# discriminated union type to and from JSON.

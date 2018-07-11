@@ -1,6 +1,6 @@
 ﻿using System;
 
-namespace Newtonsoft.Json.Linq
+namespace doG.Newtonsoft.Json.Linq
 {
     /// <summary>
     /// Specifies the settings used when loading JSON.

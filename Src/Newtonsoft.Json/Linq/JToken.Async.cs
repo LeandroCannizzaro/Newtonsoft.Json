@@ -29,9 +29,9 @@ using System;
 using System.Globalization;
 using System.Threading;
 using System.Threading.Tasks;
-using Newtonsoft.Json.Utilities;
+using doG.Newtonsoft.Json.Utilities;
 
-namespace Newtonsoft.Json.Linq
+namespace doG.Newtonsoft.Json.Linq
 {
     public abstract partial class JToken
     {

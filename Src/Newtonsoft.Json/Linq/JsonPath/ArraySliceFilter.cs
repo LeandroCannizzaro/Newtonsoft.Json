@@ -1,9 +1,9 @@
 using System;
 using System.Collections.Generic;
 using System.Globalization;
-using Newtonsoft.Json.Utilities;
+using doG.Newtonsoft.Json.Utilities;
 
-namespace Newtonsoft.Json.Linq.JsonPath
+namespace doG.Newtonsoft.Json.Linq.JsonPath
 {
     internal class ArraySliceFilter : PathFilter
     {

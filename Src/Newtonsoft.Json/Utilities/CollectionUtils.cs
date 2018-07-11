@@ -31,7 +31,7 @@ using System.Text;
 using System.Collections;
 using System.Diagnostics;
 #if !HAVE_LINQ
-using Newtonsoft.Json.Utilities.LinqBridge;
+using doG.Newtonsoft.Json.Utilities.LinqBridge;
 #else
 using System.Linq;
 #endif
@@ -39,9 +39,9 @@ using System.Globalization;
 #if HAVE_METHOD_IMPL_ATTRIBUTE
 using System.Runtime.CompilerServices;
 #endif
-using Newtonsoft.Json.Serialization;
+using doG.Newtonsoft.Json.Serialization;
 
-namespace Newtonsoft.Json.Utilities
+namespace doG.Newtonsoft.Json.Utilities
 {
     internal static class CollectionUtils
     {
